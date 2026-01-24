@@ -86,3 +86,8 @@ AMENT_IGNORE
 # OS files
 .DS_Store
 Thumbs.db
+
+# Other SDK and demos
+Booster_SDK
+webots
+booster-runner*
