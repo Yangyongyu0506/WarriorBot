@@ -1,10 +1,12 @@
-FROM osrf/ros:humble-desktop-full
+FROM osrf/ros:humble-desktop-full 
 LABEL maintainer="杨涌玉"
+
 RUN apt-get update && apt-get install -y \
+    cmake \
     python3-colcon-common-extensions \
     python3-pip \
     ros-humble-rosidl-default-generators \
-    ros-humble-webots-ros2 \
+    ros-humble-ament-cmake \
     libasio-dev \
     libtinyxml2-dev \
     wget \
@@ -20,23 +22,33 @@ RUN apt-get update && apt-get install -y \
     libsdl2-dev \
     joystick \
     libspdlog-dev \
-    tmux && \
+    tmux \
     vim && \
     rm -rf /var/lib/apt/lists/*
+
 RUN pip3 install pybind11 pybind11-stubgen
+
 RUN mkdir -p /WarriorBot_dev
 WORKDIR /WarriorBot_dev
+
 COPY Booster_SDK ./Booster_SDK
-COPY webots /usr/local/webots
-COPY webots_simulation ./webots_simulation
+COPY booster_assets ./booster_assets
+COPY fastdds_profile.xml ./fastdds_profile.xml
+
+ENV FASTRTPS_DEFAULT_PROFILES_FILE=/WarriorBot_dev/fastdds_profile.xml
+
+RUN mkdir scripts
 RUN mkdir -p ros2_ws/src
-ENV WEBOTS_HOME=/usr/local/webots
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$WEBOTS_HOME/lib/controller
+COPY ros2_ws/src/ ./ros2_ws/src/
+COPY ./isaac_package/booster_ros2 ./booster_ros2
+
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
-RUN cd Booster_SDK && \
-       ./install.sh && \
-       mkdir build && \
-       cd build && \
-       cmake .. -DBUILD_PYTHON_BINDING=on && \
-       make && \
-       make install	
+RUN echo "source /WarriorBot_dev/booster_ros2/install/setup.bash" >> ~/.bashrc
+
+RUN cd /WarriorBot_dev/Booster_SDK && \
+    ./install.sh && \
+    mkdir build && \
+    cd build && \
+    cmake .. -DBUILD_PYTHON_BINDING=on && \
+    make && \
+    make install
