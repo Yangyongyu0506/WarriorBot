@@ -23,18 +23,4 @@ xhost +local:root && docker compose up -d
 ```bash
 sh isaac_package_0.0.7.run --noexec --keep
 ```
-解压。接下来实现isaac sim启动与ros2启动解耦。
-
-isaac sim自带一个最小的ROS2内核，我们需要指定一些环境变量才能使isaac sim发布ROS2话题：
-```bash
-export ROS_DISTRO=humble
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/isaac-sim/exts/isaacsim.ros2.bridge/humble/lib
-export OMNI_KIT_ALLOW_ROOT=1
-```
-
-由于isaac sim自带一个特殊的python环境，所以启动仿真脚本必须输入如下命令：
-```bash
-/isaac-sim/python.sh \
-  /isaac-sim/booster_sim/booster_isaac/booster_standalone_ros2_robocup_t1.py
-```
+首先制作一个同时带isaac sim 4.2.0和ros-humble的镜像（见Dockerfile），然后运行run_docker.sh启动镜像即可。

@@ -94,3 +94,4 @@ booster-runner*
 booster_assets
 scripts
 isaac_package
+*.run
