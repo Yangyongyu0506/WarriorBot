@@ -1,0 +1,42 @@
+[INFO] [launch]: All log files can be found below /home/booster/.ros/log/2025-01-15-10-50-07-390419-tegra-ubuntu-11834
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [vision_node-1]: process started with pid [11878]
+[vision_node-1] Warning: Configuration file empty!
+[vision_node-1] loaded file: 
+[vision_node-1] show_res: false
+[vision_node-1] camera:
+[vision_node-1]   type: realsense
+[vision_node-1]   intrin:
+[vision_node-1]     fx: 643.898
+[vision_node-1]     fy: 643.216
+[vision_node-1]     cx: 649.038
+[vision_node-1]     cy: 357.21
+[vision_node-1]     distortion_coeffs: [-0.0553056, 0.065975, -0.000994232, 2.98548e-05, -0.0216579]
+[vision_node-1]     distortion_model: 2
+[vision_node-1]   extrin:
+[vision_node-1]     - [0.05659255, 0.03014561, 0.99794215, 0.04217854]
+[vision_node-1]     - [-0.99839673, 0.00283376, 0.05653273, 0.01405556]
+[vision_node-1]     - [-0.00112372, -0.9995415, 0.03025765, -0.01538294]
+[vision_node-1]     - [0., 0., 0., 1.]
+[vision_node-1]   pitch_compensation: 0.0
+[vision_node-1]   yaw_compensation: 0.0
+[vision_node-1]   z_compensation: 0.0
+[vision_node-1] detection_model:
+[vision_node-1]   model_path: ./src/vision/model/best_orin.engine
+[vision_node-1]   confidence_threshold: 0.2
+[vision_node-1] use_depth: true
+[vision_node-1] ball_pose_estimator:
+[vision_node-1]   use_depth: false
+[vision_node-1]   radius: 1.109
+[vision_node-1]   down_sample_leaf_size: 0.01
+[vision_node-1]   cluster_distance_threshold: 0.01
+[vision_node-1]   fitting_distance_threshold: 0.01
+[vision_node-1] human_like_pose_estimator:
+[vision_node-1]   use_depth: false
+[vision_node-1]   down_sample_leaf_size: 0.01
+[vision_node-1]   fitting_distance_threshold: 0.01
+[vision_node-1]   statistic_outlier_multiplier: 0.01
+[vision_node-1] loading det engine: ./src/vision/model/best_orin.engine
+[vision_node-1] [W] [TRT] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+[vision_node-1] [01/15/2025-10:50:07] det model initialization, done!
+[ERROR] [vision_node-1]: process has died [pid 11878, exit code -9, cmd '/home/booster/Playground/robocup_demo/install/vision/lib/vision/vision_node /home/booster/Playground/robocup_demo/install/vision/share/vision/launch/../config/vision.yaml /home/booster/Playground/robocup_demo/install/vision/share/vision/launch/../config/vision_local.yaml --ros-args -r __node:=vision_node --params-file /tmp/launch_params_1d1zg7iy'].
