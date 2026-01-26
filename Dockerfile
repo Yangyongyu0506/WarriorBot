@@ -53,6 +53,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     ros-humble-rosidl-default-generators \
     ros-humble-ament-cmake \
+    ros-humble-xacro \
+    psmisc \
     libasio-dev \
     libtinyxml2-dev \
     wget \

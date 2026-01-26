@@ -21,6 +21,6 @@ xhost +local:root && docker compose up -d
 ```
 在isaac sim的容器里运行一键启动脚本失败了，因为该脚本假设isaac sim和ros2在同一环境。并且该脚本是makeself脚本，内容极大，无法用文本编辑器查看。运行：
 ```bash
-sh isaac_package_0.0.7.run --noexec --keep
+sh isaac_package_t1_7dof_arms_hand_0.0.2.run --noexec --keep
 ```
 首先制作一个同时带isaac sim 4.2.0和ros-humble的镜像（见Dockerfile），然后运行run_docker.sh启动镜像即可。
