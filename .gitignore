@@ -93,6 +93,6 @@ webots
 booster-runner*
 booster_assets
 scripts
-isaac_package
+isaac_package*
 *.
 simulation*

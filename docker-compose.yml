@@ -12,7 +12,7 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ./ros2_ws:/WarriorBot_dev/ros2_ws:rw
-      - ./scripts:/WarriorBot_dev/scripts:rw
+      - ./scripts:/WarriorBot_dev/scripts:ro
       - /dev:/dev:rw
 
   isaac-sim:
@@ -43,3 +43,4 @@ services:
 
       # Your scripts
       - ./isaac_package/booster_sim:/isaac-sim/booster_sim:rw
+      - ./scripts:/isaac-sim/scripts:ro
