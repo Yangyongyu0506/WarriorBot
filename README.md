@@ -24,3 +24,14 @@ xhost +local:root && docker compose up -d
 sh isaac_package_t1_7dof_arms_hand_0.0.2.run --noexec --keep
 ```
 首先制作一个同时带isaac sim 4.2.0和ros-humble的镜像（见Dockerfile），然后运行run_docker.sh启动镜像即可。
+## Dockerfile使用方法
+需要将Booster_SDK和booster_assets文件夹下载到WarriorBot目录下，以供镜像内的环境配置。其次在scripts文件夹下将[https://booster.feishu.cn/wiki/H2Dowdnokij7p8ks9K3cZPuJnOg](url)中的isaac_package_0.0.7.run脚本和booster-runner-full-0.0.11.run脚本下载到其中。由于这两个脚本需要在容器中运行，所以需要运行上述指令解压并进行一定程度修改。
+#### 脚本修改
+在scripts目录下运行：
+```bash
+sh isaac_package_0.0.7.run --noexec --keep
+sh booster-runner-full-0.0.11.run --noexec --keep
+```
+将两脚本解压。随后在isaac_package_0.0.7.run生成的目录中修改.sh脚本，将其中的default_isaac_path变量修改为/isaac-sim/python.sh，在booster-runner-full-0.0.11.run生成的目录中修改.sh脚本将所有命令前的sudo去掉（因为在容器内运行本身就是root权限）。之后运行两个目录下的readme.md将目录压缩回脚本即可。
+
+最后直接运行run_docker.sh即可启动docker容器，其名为warriorsim。
