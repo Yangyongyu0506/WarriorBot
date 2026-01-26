@@ -39,6 +39,14 @@ bash run_docker.sh # 运行此脚本来启动容器
 - 本教程虽然只提到了4自由度手机器人脚本的修改方法，但是其他模型机器人脚本修改方法一样。
 - 制备同时带有isaac-sim和ros-humble的镜像，参见[https://github.com/arambarricalvoj/nvidia_isaac-sim_ros2_docker.git](url)
 - 只有灵巧手模型的机器人仿真会发布/tf话题，这是因为只有灵巧手机器人的脚本中启动了robot_state_publisher节点。其他脚本经过类似的修改也可以实现相同效果。
+### 4dof手臂模型机器人的isaac-sim仿真如何调出/tf话题
+修改isaac_package/start_ros2_local_isaac_sim.sh。首先要加入robot_state_publisher节点，然后作话题重映射：
+```bash
+# start robot_state_publisher
+killall robot_state_publisher
+ros2 run robot_state_publisher robot_state_publisher --ros-args -p robot_description:="$(xacro /WarriorBot_dev/booster_assets/robots/T1/T1_23dof.urdf)" \
+  -r /joint_states:=/booster/ros2_k2_joint_states &
+```
 ## ROS2开发
 所有比赛用代码均源于ros2_ws/src/warriordev包。
 

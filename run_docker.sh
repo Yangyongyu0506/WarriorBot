@@ -9,6 +9,7 @@ docker run \
     -e DISPLAY=$DISPLAY \
     -v ./ros2_ws:/WarriorBot_dev/ros2_ws \
     -v ./scripts:/WarriorBot_dev/scripts \
+    -v ./booster_assets:/WarriorBot_dev/booster_assets \
     -v /dev:/dev \
     -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
     -e "PRIVACY_CONSENT=Y" \
