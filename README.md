@@ -39,3 +39,34 @@ bash run_docker.sh # 运行此脚本来启动容器
 - 本教程虽然只提到了4自由度手机器人脚本的修改方法，但是其他模型机器人脚本修改方法一样。
 - 制备同时带有isaac-sim和ros-humble的镜像，参见[https://github.com/arambarricalvoj/nvidia_isaac-sim_ros2_docker.git](url)
 - 只有灵巧手模型的机器人仿真会发布/tf话题，这是因为只有灵巧手机器人的脚本中启动了robot_state_publisher节点。其他脚本经过类似的修改也可以实现相同效果。
+## ROS2开发
+所有比赛用代码均源于ros2_ws/src/warriordev包。
+
+### setup.py的修改
+为了使得colcon能够一并将launch文件和配置文件打包构建，需要在setup.py中加如下代码：
+```python
+import os
+from glob import glob
+...
+        (f'share/{package_name}/config', glob('config/*')), # include configurations
+        (f'share/{package_name}/launch', glob('launch/*')), # include launch files
+...
+```
+### ROS2节点的安全退出
+由于大多数机器人都是典型的大小脑架构，在上位机退出程序时并不会自动发送指令终止下位机，因此如果机器人正在行走，我们把上层操作节点杀掉，机器人就会保持原速行走，非常危险。
+
+我们在ctrl+C中断程序的时候，rclc底层的执行器会在Python的try-except块捕捉到错误前出错，因此必须引入rclpy.executors的ExternalShutdownException。main函数按照以下框架写：
+```python
+def main():
+    rclpy.init()
+    node = SquareRouteNode()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        node.send_cmd(0.0, 0.0) # 这里停止下位机
+        node.get_logger().warn("Shutting down SquareRouteNode...")
+    finally:
+        if rclpy.ok(): # 检测ros2的环境是否还在 
+            node.destroy_node()
+            rclpy.shutdown()
+```

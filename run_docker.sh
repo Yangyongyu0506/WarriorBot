@@ -22,4 +22,6 @@ docker run \
     -v ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw \
     -v ~/docker/isaac-sim/documents:/root/Documents:rw \
     --name warriorsim \
-    warriorsim:latest \
+    warriorsim:latest
+docker exec -it warriorsim bash -c "tmux"
+docker rm -f warriorsim
