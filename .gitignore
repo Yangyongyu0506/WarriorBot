@@ -92,7 +92,7 @@ Booster_SDK
 webots
 booster-runner*
 booster_assets
-scripts
+scripts/*
 isaac_package*
 *.
 simulation*
