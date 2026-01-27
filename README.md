@@ -101,12 +101,54 @@ docker run --rm --gpus all nvidia/cuda:12.0-base-ubuntu22.04 nvidia-smi
 ### 基于宿主机python虚拟环境安装Isaac-Lab
 参见[https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/pip_installation.html](url)
 ### 为ssh开启GUI支持
-本地配置
+#### 本地配置
 ```bash
 sudo apt install x11-xserver-utils # 安装x11工具
 xhost + # 允许所有主机连接
 ```
-远程服务器配置
+#### 远程服务器配置
 ```bash
-
+sudo nano /etc/ssh/sshd_config
 ```
+确保以下几行没有被注释且值为 yes：
+- X11Forwarding yes
+- X11DisplayOffset 10
+- X11UseLocalhost yes
+重启ssh服务：
+```bash
+sudo systemctl restart sshd
+```
+在本机当前终端使用ssh连接时添加 -X 参数：
+```bash
+ssh -X user@remote_host
+```
+测试GUI转发：
+```bash
+xclock
+```
+如果看到时钟窗口弹出，则说明配置成功。
+
+注意不要使用sudo权限运行GUI程序，因为.Xauthority文件一般存在~目录下，sudo会切换用户导致无法访问该文件。
+### 为服务器配置github ssh key
+```bash
+ssh-keygen -t ed25519 -C "your_email@example.com" # 生成ssh key
+cat ~/.ssh/id_ed25519.pub # 复制公钥内容到github
+```
+在github的Settings->SSH and GPG keys中添加新的ssh key，标题随意，内容粘贴刚才复制的公钥内容。
+测试连接：
+```bash
+ssh -T git@github.com
+```
+如果看到 "You've successfully authenticated" 则说明配置成功。
+### 使用tmux管理远程会话
+安装tmux：
+```bash
+sudo apt install tmux
+```
+tmux可以实现会话与终端窗口分离，即使ssh连接断开，tmux会话内的进程仍然保持运行。使用方法：
+```bash
+tmux # 启动一个新的tmux会话
+tmux ls # 列出所有tmux会话
+tmux attach -t <session_name> # 重新连接到指定的tmux会话
+```
+在tmux会话内，可以使用Ctrl+b然后按c创建新窗口，使用Ctrl+b然后按n或p切换窗口。
