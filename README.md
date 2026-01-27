@@ -80,3 +80,33 @@ def main():
 ```
 ## 强化学习
 由于规则改变，现在开始全心全意解决强化学习。
+### 服务器冲突问题排解
+另一个使用服务器的人也用tailscale作内网穿刺，这会导致我们账号的tailscale ip失效，因此需要切换tailscale账号：
+```bash
+sudo tailscale switch yangyongyu0506.github
+tailscale ip # 查看内网穿刺ip
+```
+### 为docker容器添加GPU支持
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+  && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+docker run --rm --gpus all nvidia/cuda:12.0-base-ubuntu22.04 nvidia-smi
+```
+### 基于宿主机python虚拟环境安装Isaac-Lab
+参见[https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/pip_installation.html](url)
+### 为ssh开启GUI支持
+本地配置
+```bash
+sudo apt install x11-xserver-utils # 安装x11工具
+xhost + # 允许所有主机连接
+```
+远程服务器配置
+```bash
+
+```
