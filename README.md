@@ -78,3 +78,5 @@ def main():
             node.destroy_node()
             rclpy.shutdown()
 ```
+## 强化学习
+由于规则改变，现在开始全心全意解决强化学习。
