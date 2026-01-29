@@ -3,12 +3,6 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-import math
-import torch
-
-import isaaclab.utils.math as math_utils
-from isaaclab.assets import Articulation
-from isaaclab.envs import ManagerBasedRLEnv
 
 """Environment configuration for Booster T1 humanoid walking on rough terrain.
 
@@ -17,11 +11,9 @@ and curriculum using Isaac Lab's manager-based style. Tuned for biped gait
 stability with height scanning, contact sensing, and biped-specific rewards.
 """
 
-from dataclasses import MISSING
-
+import math
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
-from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
@@ -30,39 +22,16 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
-from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
-
-from isaaclab.managers import RewardTermCfg as RewTerm
-from isaaclab.managers import SceneEntityCfg
-from isaaclab.utils import configclass
-
 import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
-from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg, RewardsCfg
+from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
 from .mdp.events import sync_action_offsets_to_defaults
 from .mdp.terminations import is_fallen
-from .mdp import rewards as my_rew
-
-##
 # Pre-defined configs
-##
-from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG  # isort: skip
 from .robots.booster import BOOSTER_T1_CFG  # isort: skip
-#
-# Custom termination utilities
-#
 
-
-
-
-##
 # Scene definition
-##
-
-
 @configclass
 class BoosterT1RoughSceneCfg(InteractiveSceneCfg):
     """Configuration for a cart-pole scene."""
@@ -81,58 +50,8 @@ class BoosterT1RoughSceneCfg(InteractiveSceneCfg):
         prim_path="/World/DomeLight",
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
     )
-
-@configclass
-class MySceneCfg(InteractiveSceneCfg):
-    """Configuration for the terrain scene with a legged robot."""
-
-    # ground terrain
-    terrain = TerrainImporterCfg(
-        prim_path="/World/ground",
-        terrain_type="generator",
-        terrain_generator=ROUGH_TERRAINS_CFG,
-        max_init_terrain_level=5,
-        collision_group=-1,
-        physics_material=sim_utils.RigidBodyMaterialCfg(
-            friction_combine_mode="multiply",
-            restitution_combine_mode="multiply",
-            static_friction=1.0,
-            dynamic_friction=1.0,
-        ),
-        visual_material=sim_utils.MdlFileCfg(
-            mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
-            project_uvw=True,
-            texture_scale=(0.25, 0.25),
-        ),
-        debug_vis=False,
-    )
-    # robots
-    robot: ArticulationCfg = MISSING
-    # sensors
-    height_scanner = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base",
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
-        ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
-        debug_vis=False,
-        mesh_prim_paths=["/World/ground"],
-    )
-    contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
-    # lights
-    sky_light = AssetBaseCfg(
-        prim_path="/World/skyLight",
-        spawn=sim_utils.DomeLightCfg(
-            intensity=750.0,
-            texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
-        ),
-    )
-
-
-##
+    
 # MDP settings
-##
-
-
 @configclass
 class CommandsCfg:
     """Command specifications for the MDP."""
@@ -156,7 +75,6 @@ class ActionsCfg:
 
     joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.7, use_default_offset=True)
 
-
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
@@ -164,8 +82,6 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-
-        # observation terms (order preserved)
         # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
         projected_gravity = ObsTerm(
@@ -176,7 +92,6 @@ class ObservationsCfg:
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
         actions = ObsTerm(func=mdp.last_action)
-
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
@@ -184,7 +99,6 @@ class ObservationsCfg:
     @configclass
     class CriticCfg(ObsGroup):
         """Observations for critic group."""
-
         # observation terms (order preserved)
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
@@ -198,15 +112,12 @@ class ObservationsCfg:
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
             clip=(-1.0, 1.0),
         )
-
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = True
-
     # observation groups
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
-
 
 @configclass
 class EventCfg:
@@ -297,7 +208,6 @@ class EventCfg:
         params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}},
     )
 
-
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
@@ -324,16 +234,10 @@ class CurriculumCfg:
 
     terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
 
-
-
 @configclass
 class T1Rewards:
     """Reward terms for Booster T1 rough terrain locomotion."""
-
-    # ------------------------------------------------------------
     # 核心驱动力：速度跟踪（command ≠ 0 时，不动就是负反馈）
-    # ------------------------------------------------------------
-
     track_lin_vel_xy = RewTerm(
         func=mdp.track_lin_vel_xy_yaw_frame_exp,
         weight=1.5,   # 比之前更强
@@ -342,36 +246,25 @@ class T1Rewards:
             "std": 0.5,
         },
     )
-
-    # ------------------------------------------------------------
     # Base 姿态（防佝偻）
-    # ------------------------------------------------------------
-
     base_orientation = RewTerm(
         func=mdp.flat_orientation_l2,
         weight=-3.0,   # 必须大
     )
-
     base_ang_vel = RewTerm(
         func=mdp.ang_vel_xy_l2,
-        weight=-0.05,
+        weight=-0.15,
     )
-
     # 垂直速度惩罚
-
     base_lin_vel = RewTerm(
         func=mdp.lin_vel_z_l2,
         weight=-2.0,
     )
-
-    # ------------------------------------------------------------
     # 关节偏离惩罚（分组）
-    # ------------------------------------------------------------
-
     # 腰 + 脖子：极强
     torso_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-2.0,
+        weight=-1.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -383,7 +276,6 @@ class T1Rewards:
             )
         },
     )
-
     # 手臂：中等
     arm_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
@@ -404,7 +296,6 @@ class T1Rewards:
             )
         },
     )
-
     # 腿：弱（允许迈步）
     leg_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
@@ -420,25 +311,22 @@ class T1Rewards:
             )
         },
     )
-
-    # ------------------------------------------------------------
+    # 摆腿奖励
+    hip_swing = RewTerm(
+        func=mdp.joint_vel_l2,
+        weight=+0.02,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*Hip_Pitch.*"])}
+    )
     # 能量 & 平滑
-    # ------------------------------------------------------------
-
     joint_torque_penalty = RewTerm(
         func=mdp.joint_torques_l2,
         weight=-2.0e-5,
     )
-
     action_rate_penalty = RewTerm(
         func=mdp.action_rate_l2,
         weight=-0.01,
     )
-
-    # ------------------------------------------------------------
     # 步态质量（强烈推荐）
-    # ------------------------------------------------------------
-
     foot_air_time = RewTerm(
         func=mdp.feet_air_time,
         weight=0.2,
@@ -449,11 +337,8 @@ class T1Rewards:
         },
     )
 
-
-
 @configclass
 class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
-
     actions: ActionsCfg = ActionsCfg()
     rewards: T1Rewards = T1Rewards()
     terminations: TerminationsCfg = TerminationsCfg()
@@ -461,21 +346,14 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
     curriculum : CurriculumCfg = CurriculumCfg()
     # scene: MySceneCfg = MySceneCfg()
     events: EventCfg = EventCfg()
-
     def __post_init__(self):
         super().__post_init__()
-
-        # ------------------------------------------------------------------
         # Scene
-        # ------------------------------------------------------------------
         self.scene.robot = BOOSTER_T1_CFG.replace(
             prim_path="{ENV_REGEX_NS}/Robot"
         )
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Waist"
-
-        # ------------------------------------------------------------------
         # Disable over-randomization (early learning killer)
-        # ------------------------------------------------------------------
         self.events.push_robot = None
         self.events.add_base_mass = None
         self.events.base_com = None
@@ -497,17 +375,11 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
                 "yaw": (0.0, 0.0),
             },
         }
-
-        # ------------------------------------------------------------------
         # Commands (NO SIDEWAYS WALKING INITIALLY)
-        # ------------------------------------------------------------------
         self.commands.base_velocity.ranges.lin_vel_x = (0.4, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.2, 0.2)
         self.commands.base_velocity.ranges.ang_vel_z = (-0.6, 0.6)
-
-        # ------------------------------------------------------------------
         # Termination tuning
-        # ------------------------------------------------------------------
         self.terminations.base_contact.params["sensor_cfg"].body_names = "H2"
         self.terminations.fallen.params.update(
             dict(
@@ -517,13 +389,10 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
             )
         )
 
-
 @configclass
 class BoosterT1RoughEnvCfg_PLAY(BoosterT1RoughEnvCfg):
     def __post_init__(self):
-        # post init of parent
         super().__post_init__()
-
         # make a smaller scene for play
         self.scene.num_envs = 50
         self.scene.env_spacing = 2.5
@@ -535,7 +404,6 @@ class BoosterT1RoughEnvCfg_PLAY(BoosterT1RoughEnvCfg):
             self.scene.terrain.terrain_generator.num_rows = 5
             self.scene.terrain.terrain_generator.num_cols = 5
             self.scene.terrain.terrain_generator.curriculum = False
-
         self.commands.base_velocity.ranges.lin_vel_x = (1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
