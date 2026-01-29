@@ -166,7 +166,7 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
+        # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
         projected_gravity = ObsTerm(
             func=mdp.projected_gravity,
@@ -176,19 +176,36 @@ class ObservationsCfg:
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
         actions = ObsTerm(func=mdp.last_action)
-        height_scan = ObsTerm(
-            func=mdp.height_scan,
-            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-            noise=Unoise(n_min=-0.1, n_max=0.1),
-            clip=(-1.0, 1.0),
-        )
 
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
 
+    @configclass
+    class CriticCfg(ObsGroup):
+        """Observations for critic group."""
+
+        # observation terms (order preserved)
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        projected_gravity = ObsTerm(func=mdp.projected_gravity)
+        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        actions = ObsTerm(func=mdp.last_action)
+        height_scan = ObsTerm(
+            func=mdp.height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            clip=(-1.0, 1.0),
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
+    critic: CriticCfg = CriticCfg()
 
 
 @configclass
@@ -282,42 +299,6 @@ class EventCfg:
 
 
 @configclass
-class RewardsCfg:
-    """Reward terms for the MDP."""
-
-    # -- task
-    track_lin_vel_xy_exp = RewTerm(
-        func=mdp.track_lin_vel_xy_exp, weight=1.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
-    )
-    track_ang_vel_z_exp = RewTerm(
-        func=mdp.track_ang_vel_z_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
-    )
-    # -- penalties
-    lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-2.0)
-    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
-    dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-1.0e-5)
-    dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
-    feet_air_time = RewTerm(
-        func=mdp.feet_air_time,
-        weight=0.125,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
-            "command_name": "base_velocity",
-            "threshold": 0.5,
-        },
-    )
-    # undesired_contacts = RewTerm(
-    #     func=mdp.undesired_contacts,
-    #     weight=-1.0,
-    #     params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*THIGH"), "threshold": 1.0},
-    # )
-    # -- optional penalties
-    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=0.0)
-    dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)
-
-
-@configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
@@ -344,93 +325,6 @@ class CurriculumCfg:
     terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
 
 
-
-
-
-# @configclass
-# class T1Rewards(RewardsCfg):
-#     """Reward terms for the MDP."""
-
-#     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
-#     track_lin_vel_xy_exp = RewTerm(
-#         func=mdp.track_lin_vel_xy_yaw_frame_exp,
-#         weight=1.0,
-#         params={"command_name": "base_velocity", "std": 0.5},
-#     )
-#     track_ang_vel_z_exp = RewTerm(
-#         func=mdp.track_ang_vel_z_world_exp, weight=2.0, params={"command_name": "base_velocity", "std": 0.5}
-#     )
-#     feet_air_time = RewTerm(
-#         func=mdp.feet_air_time_positive_biped,
-#         weight=0.25,
-#         params={
-#             "command_name": "base_velocity",
-#             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
-#             "threshold": 0.4,
-#         },
-#     )
-#     feet_slide = RewTerm(
-#         func=mdp.feet_slide,
-#         weight=-0.1,
-#         params={
-#             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
-#             "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot_link"),
-#         },
-#     )
-
-#     # Encourage lifting swing foot during air phase
-#     swing_height_bonus = RewTerm(
-#         func=my_rew.swing_foot_height_bonus,
-#         weight=0.3,
-#         params={
-#             "height_margin": 0.05,
-#             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
-#             "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot_link"),
-#         },
-#     )
-#     # Discourage double support when commanded to move
-#     double_support = RewTerm(
-#         func=my_rew.double_support_penalty,
-#         weight=-0.2,
-#         params={
-#             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
-#             "command_name": "base_velocity",
-#             "min_speed": 0.2,
-#         },
-#     )
-
-#     # Penalize Ankle joint limits
-#     dof_pos_limits = RewTerm(
-#         func=mdp.joint_pos_limits,
-#         weight=-1.0,
-#         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
-#     )
-#     # Penalize deviation from default of the joints that are not essential for locomotion
-#     joint_deviation_Hip = RewTerm(
-#         func=mdp.joint_deviation_l1,
-#         weight=-0.1,
-#         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Hip_Yaw", ".*_Hip_Roll"])},
-#     )
-#     joint_deviation_arms = RewTerm(
-#         func=mdp.joint_deviation_l1,
-#         weight=-0.1,
-#         params={
-#             "asset_cfg": SceneEntityCfg(
-#                 "robot",
-#                 joint_names=[
-#                     ".*_Shoulder_Pitch",
-#                     ".*_Shoulder_Roll",
-#                     ".*_Elbow_Pitch",
-#                     ".*_Elbow_Yaw",
-#                 ],
-#             )
-#         },
-#     )
-#     joint_deviation_torso = RewTerm(
-#         func=mdp.joint_deviation_l1,
-#         weight=-0.1,
-#         params={"asset_cfg": SceneEntityCfg("robot", joint_names="Waist")},
-#     )
 
 @configclass
 class T1Rewards:
@@ -556,64 +450,6 @@ class T1Rewards:
     )
 
 
-# @configclass
-# class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
-#     actions: ActionsCfg = ActionsCfg()
-#     rewards: T1Rewards = T1Rewards()
-#     terminations: TerminationsCfg = TerminationsCfg()
-
-#     def __post_init__(self):
-#         # post init of parent
-#         super().__post_init__()
-#         # Scene
-#         self.scene.robot = BOOSTER_T1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-#         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Waist"
-
-#         # Randomization
-#         self.events.push_robot = None
-#         self.events.add_base_mass = None
-#         self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
-#         self.events.base_external_force_torque.params["asset_cfg"].body_names = ["Waist"]
-#         self.events.reset_base.params = {
-#             "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
-#             "velocity_range": {
-#                 "x": (0.0, 0.0),
-#                 "y": (0.0, 0.0),
-#                 "z": (0.0, 0.0),
-#                 "roll": (0.0, 0.0),
-#                 "pitch": (0.0, 0.0),
-#                 "yaw": (0.0, 0.0),
-#             },
-#         }
-#         self.events.base_com = None
-
-#         # Rewards
-#         self.rewards.lin_vel_z_l2.weight = 0.0
-#         self.rewards.undesired_contacts = None
-#         self.rewards.flat_orientation_l2.weight = -1.0
-#         self.rewards.action_rate_l2.weight = -0.005
-#         self.rewards.dof_acc_l2.weight = -1.25e-7
-#         self.rewards.dof_acc_l2.params["asset_cfg"] = SceneEntityCfg(
-#             "robot", joint_names=[".*_Hip_.*", ".*_Knee_Pitch"]
-#         )
-#         self.rewards.dof_torques_l2.weight = -1.5e-7
-#         self.rewards.dof_torques_l2.params["asset_cfg"] = SceneEntityCfg(
-#             "robot", joint_names=[".*_Hip_.*", ".*_Knee_Pitch", ".*_Ankle_.*"]
-#         )
-
-#         # Commands
-#         self.commands.base_velocity.ranges.lin_vel_x = (0.0, 1.0)
-#         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-#         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
-
-#         # terminations
-#         self.terminations.base_contact.params["sensor_cfg"].body_names = "Waist"
-#         # adjust fallen detection to stair-friendly relative clearance
-#         self.terminations.fallen.params["asset_cfg"].body_names = "Waist"
-#         self.terminations.fallen.params["foot_names"] = ".*_foot_link"
-#         self.terminations.fallen.params["min_clearance"] = 0.18
-#         self.terminations.fallen.params["tilt_threshold"] = 0.9
-#         self.terminations.fallen.params["persist_steps"] = 3
 
 @configclass
 class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
@@ -621,6 +457,10 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
     actions: ActionsCfg = ActionsCfg()
     rewards: T1Rewards = T1Rewards()
     terminations: TerminationsCfg = TerminationsCfg()
+    observations: ObservationsCfg = ObservationsCfg()
+    curriculum : CurriculumCfg = CurriculumCfg()
+    # scene: MySceneCfg = MySceneCfg()
+    events: EventCfg = EventCfg()
 
     def __post_init__(self):
         super().__post_init__()
