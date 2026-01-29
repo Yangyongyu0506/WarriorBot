@@ -235,11 +235,6 @@ class T1Rewards:
             "std": 0.5,
         },
     )
-    track_heading = RewTerm(
-        func=mdp.track_heading_exp,
-        weight=0.6,
-        params={"command_name": "base_velocity"},
-    )
     # Base 姿态（防佝偻）
     base_orientation = RewTerm(
         func=mdp.flat_orientation_l2,
