@@ -139,3 +139,55 @@ def feet_stance_time(
     env._buf_feet_stance_time += env.step_dt
     env._buf_feet_stance_time *= stance
     return rew_stanceTime
+
+
+def swing_foot_height_bonus(
+        env: ManagerBasedRLEnv,
+        height_margin: float,
+        sensor_cfg: SceneEntityCfg,
+        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Reward lifting swing feet higher than base by a margin.
+
+    For each foot currently in air (based on contact sensor's current_air_time > 0),
+    adds a bonus proportional to ReLU(foot_z - base_z - height_margin).
+    """
+    # sensors and asset
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    asset = env.scene[asset_cfg.name]
+    # indices
+    body_ids = asset_cfg.body_ids
+    if isinstance(body_ids, slice):
+        body_ids = list(range(len(asset.body_names)))
+    # states
+    base_z = asset.data.root_pos_w[:, 2]
+    foot_z = asset.data.body_pos_w[:, body_ids, 2]
+    # air mask
+    air_time = contact_sensor.data.current_air_time[:, body_ids]
+    in_air = air_time > 0.0
+    # bonus
+    bonus = (foot_z - base_z.unsqueeze(-1) - height_margin).clip(min=0.0)
+    bonus = (bonus * in_air.float()).sum(dim=1)
+    return bonus
+
+
+def double_support_penalty(
+        env: ManagerBasedRLEnv,
+        sensor_cfg: SceneEntityCfg,
+        command_name: str,
+        min_speed: float
+) -> torch.Tensor:
+    """Penalize double support when commanded speed is non-trivial.
+
+    If both feet are in contact and the command XY speed exceeds `min_speed`,
+    returns 1.0 per env; otherwise 0.0. Use negative weight in config.
+    """
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    # contact mask: current_contact_time > 0 means in contact
+    contact = contact_sensor.data.current_contact_time
+    # both feet in contact
+    both_contact = (contact > 0.0).sum(dim=1) >= 2
+    # command speed
+    cmd = env.command_manager.get_command(command_name)
+    cmd_speed = torch.linalg.norm(cmd[:, :2], dim=1)
+    return (both_contact & (cmd_speed >= min_speed)).float()

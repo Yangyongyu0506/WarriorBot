@@ -44,6 +44,7 @@ import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
 from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg, RewardsCfg
 from .mdp.events import sync_action_offsets_to_defaults
 from .mdp.terminations import is_fallen
+from .mdp import rewards as my_rew
 
 ##
 # Pre-defined configs
@@ -306,11 +307,11 @@ class RewardsCfg:
             "threshold": 0.5,
         },
     )
-    undesired_contacts = RewTerm(
-        func=mdp.undesired_contacts,
-        weight=-1.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*THIGH"), "threshold": 1.0},
-    )
+    # undesired_contacts = RewTerm(
+    #     func=mdp.undesired_contacts,
+    #     weight=-1.0,
+    #     params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*THIGH"), "threshold": 1.0},
+    # )
     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=0.0)
     dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)
@@ -346,91 +347,308 @@ class CurriculumCfg:
 
 
 
-@configclass
-class T1Rewards(RewardsCfg):
-    """Reward terms for the MDP."""
+# @configclass
+# class T1Rewards(RewardsCfg):
+#     """Reward terms for the MDP."""
 
-    termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
-    track_lin_vel_xy_exp = RewTerm(
+#     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
+#     track_lin_vel_xy_exp = RewTerm(
+#         func=mdp.track_lin_vel_xy_yaw_frame_exp,
+#         weight=1.0,
+#         params={"command_name": "base_velocity", "std": 0.5},
+#     )
+#     track_ang_vel_z_exp = RewTerm(
+#         func=mdp.track_ang_vel_z_world_exp, weight=2.0, params={"command_name": "base_velocity", "std": 0.5}
+#     )
+#     feet_air_time = RewTerm(
+#         func=mdp.feet_air_time_positive_biped,
+#         weight=0.25,
+#         params={
+#             "command_name": "base_velocity",
+#             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
+#             "threshold": 0.4,
+#         },
+#     )
+#     feet_slide = RewTerm(
+#         func=mdp.feet_slide,
+#         weight=-0.1,
+#         params={
+#             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
+#             "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot_link"),
+#         },
+#     )
+
+#     # Encourage lifting swing foot during air phase
+#     swing_height_bonus = RewTerm(
+#         func=my_rew.swing_foot_height_bonus,
+#         weight=0.3,
+#         params={
+#             "height_margin": 0.05,
+#             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
+#             "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot_link"),
+#         },
+#     )
+#     # Discourage double support when commanded to move
+#     double_support = RewTerm(
+#         func=my_rew.double_support_penalty,
+#         weight=-0.2,
+#         params={
+#             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
+#             "command_name": "base_velocity",
+#             "min_speed": 0.2,
+#         },
+#     )
+
+#     # Penalize Ankle joint limits
+#     dof_pos_limits = RewTerm(
+#         func=mdp.joint_pos_limits,
+#         weight=-1.0,
+#         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
+#     )
+#     # Penalize deviation from default of the joints that are not essential for locomotion
+#     joint_deviation_Hip = RewTerm(
+#         func=mdp.joint_deviation_l1,
+#         weight=-0.1,
+#         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Hip_Yaw", ".*_Hip_Roll"])},
+#     )
+#     joint_deviation_arms = RewTerm(
+#         func=mdp.joint_deviation_l1,
+#         weight=-0.1,
+#         params={
+#             "asset_cfg": SceneEntityCfg(
+#                 "robot",
+#                 joint_names=[
+#                     ".*_Shoulder_Pitch",
+#                     ".*_Shoulder_Roll",
+#                     ".*_Elbow_Pitch",
+#                     ".*_Elbow_Yaw",
+#                 ],
+#             )
+#         },
+#     )
+#     joint_deviation_torso = RewTerm(
+#         func=mdp.joint_deviation_l1,
+#         weight=-0.1,
+#         params={"asset_cfg": SceneEntityCfg("robot", joint_names="Waist")},
+#     )
+
+@configclass
+class T1Rewards:
+    """Reward terms for Booster T1 rough-terrain locomotion."""
+
+    # ------------------------------------------------------------
+    # 核心驱动力：必须“走起来”
+    # ------------------------------------------------------------
+
+    # 1. 速度跟踪（不是主要驱动力）
+    track_lin_vel_xy = RewTerm(
         func=mdp.track_lin_vel_xy_yaw_frame_exp,
         weight=1.0,
-        params={"command_name": "base_velocity", "std": 0.5},
-    )
-    track_ang_vel_z_exp = RewTerm(
-        func=mdp.track_ang_vel_z_world_exp, weight=2.0, params={"command_name": "base_velocity", "std": 0.5}
-    )
-    feet_air_time = RewTerm(
-        func=mdp.feet_air_time_positive_biped,
-        weight=0.25,
         params={
             "command_name": "base_velocity",
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
-            "threshold": 0.4,
-        },
-    )
-    feet_slide = RewTerm(
-        func=mdp.feet_slide,
-        weight=-0.1,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot_link"),
+            "std": 0.6,
         },
     )
 
-    # Penalize Ankle joint limits
-    dof_pos_limits = RewTerm(
-        func=mdp.joint_pos_limits,
-        weight=-1.0,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
-    )
-    # Penalize deviation from default of the joints that are not essential for locomotion
-    joint_deviation_Hip = RewTerm(
-        func=mdp.joint_deviation_l1,
-        weight=-0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Hip_Yaw", ".*_Hip_Roll"])},
-    )
-    joint_deviation_arms = RewTerm(
-        func=mdp.joint_deviation_l1,
-        weight=-0.1,
-        params={
-            "asset_cfg": SceneEntityCfg(
-                "robot",
-                joint_names=[
-                    ".*_Shoulder_Pitch",
-                    ".*_Shoulder_Roll",
-                    ".*_Elbow_Pitch",
-                    ".*_Elbow_Yaw",
-                ],
-            )
-        },
-    )
-    joint_deviation_torso = RewTerm(
-        func=mdp.joint_deviation_l1,
-        weight=-0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names="Waist")},
+    # 2. 只要动，就给分（破站桩）
+    move_reward = RewTerm(
+        func=mdp.lin_vel_xy_l2,
+        weight=+0.4,
     )
 
+    # 3. 明确惩罚“静止”
+    standstill_penalty = RewTerm(
+        func=mdp.lin_vel_xy_l2,
+        weight=-0.2,
+    )
+
+    # ------------------------------------------------------------
+    # 姿态与身体结构约束（防佝偻）
+    # ------------------------------------------------------------
+
+    # Base 姿态（躯干 upright）
+    base_orientation = RewTerm(
+        func=mdp.flat_orientation_l2,
+        weight=2.5,   # ❗非常重要：必须大
+    )
+
+    # Base 角速度（防疯狂抖动）
+    base_ang_vel = RewTerm(
+        func=mdp.ang_vel_l2,
+        weight=-0.05,
+    )
+
+    # ------------------------------------------------------------
+    # 关节偏离惩罚（分 body group）
+    # ------------------------------------------------------------
+
+    # 1. 腰 + 脖子（极强约束）
+    torso_joint_deviation = RewTerm(
+        func=mdp.joint_pos_deviation_l1,
+        weight=-2.0,
+        params={
+            "asset_cfg": {
+                "joint_names": [
+                    "Waist.*",
+                    "H1",
+                    "H2",
+                ]
+            }
+        },
+    )
+
+    # 2. 手臂（中等约束，允许配平）
+    arm_joint_deviation = RewTerm(
+        func=mdp.joint_pos_deviation_l1,
+        weight=-0.6,
+        params={
+            "asset_cfg": {
+                "joint_names": [
+                    "AL.*",
+                    "AR.*",
+                    "left_hand_link",
+                    "right_hand_link",
+                ]
+            }
+        },
+    )
+
+    # 3. 腿（弱约束，鼓励迈步）
+    leg_joint_deviation = RewTerm(
+        func=mdp.joint_pos_deviation_l1,
+        weight=-0.1,
+        params={
+            "asset_cfg": {
+                "joint_names": [
+                    "Hip_.*",
+                    "Shank_.*",
+                    "Ankle_.*",
+                ]
+            }
+        },
+    )
+
+    # ------------------------------------------------------------
+    # 能量与平滑性
+    # ------------------------------------------------------------
+
+    joint_torque_penalty = RewTerm(
+        func=mdp.joint_torques_l2,
+        weight=-1.5e-5,
+    )
+
+    action_rate_penalty = RewTerm(
+        func=mdp.action_rate_l2,
+        weight=-0.01,
+    )
+
+    # ------------------------------------------------------------
+    # 步态质量（可选但强烈推荐）
+    # ------------------------------------------------------------
+
+    foot_air_time = RewTerm(
+        func=mdp.feet_air_time,
+        weight=0.15,
+        params={
+            "sensor_cfg": {
+                "body_names": ["left_foot_link", "right_foot_link"]
+            }
+        },
+    )
+
+
+# @configclass
+# class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+#     actions: ActionsCfg = ActionsCfg()
+#     rewards: T1Rewards = T1Rewards()
+#     terminations: TerminationsCfg = TerminationsCfg()
+
+#     def __post_init__(self):
+#         # post init of parent
+#         super().__post_init__()
+#         # Scene
+#         self.scene.robot = BOOSTER_T1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+#         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Waist"
+
+#         # Randomization
+#         self.events.push_robot = None
+#         self.events.add_base_mass = None
+#         self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
+#         self.events.base_external_force_torque.params["asset_cfg"].body_names = ["Waist"]
+#         self.events.reset_base.params = {
+#             "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
+#             "velocity_range": {
+#                 "x": (0.0, 0.0),
+#                 "y": (0.0, 0.0),
+#                 "z": (0.0, 0.0),
+#                 "roll": (0.0, 0.0),
+#                 "pitch": (0.0, 0.0),
+#                 "yaw": (0.0, 0.0),
+#             },
+#         }
+#         self.events.base_com = None
+
+#         # Rewards
+#         self.rewards.lin_vel_z_l2.weight = 0.0
+#         self.rewards.undesired_contacts = None
+#         self.rewards.flat_orientation_l2.weight = -1.0
+#         self.rewards.action_rate_l2.weight = -0.005
+#         self.rewards.dof_acc_l2.weight = -1.25e-7
+#         self.rewards.dof_acc_l2.params["asset_cfg"] = SceneEntityCfg(
+#             "robot", joint_names=[".*_Hip_.*", ".*_Knee_Pitch"]
+#         )
+#         self.rewards.dof_torques_l2.weight = -1.5e-7
+#         self.rewards.dof_torques_l2.params["asset_cfg"] = SceneEntityCfg(
+#             "robot", joint_names=[".*_Hip_.*", ".*_Knee_Pitch", ".*_Ankle_.*"]
+#         )
+
+#         # Commands
+#         self.commands.base_velocity.ranges.lin_vel_x = (0.0, 1.0)
+#         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
+#         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+
+#         # terminations
+#         self.terminations.base_contact.params["sensor_cfg"].body_names = "Waist"
+#         # adjust fallen detection to stair-friendly relative clearance
+#         self.terminations.fallen.params["asset_cfg"].body_names = "Waist"
+#         self.terminations.fallen.params["foot_names"] = ".*_foot_link"
+#         self.terminations.fallen.params["min_clearance"] = 0.18
+#         self.terminations.fallen.params["tilt_threshold"] = 0.9
+#         self.terminations.fallen.params["persist_steps"] = 3
 
 @configclass
 class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+
     actions: ActionsCfg = ActionsCfg()
     rewards: T1Rewards = T1Rewards()
     terminations: TerminationsCfg = TerminationsCfg()
 
     def __post_init__(self):
-        # post init of parent
         super().__post_init__()
+
+        # ------------------------------------------------------------------
         # Scene
-        self.scene.robot = BOOSTER_T1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        # ------------------------------------------------------------------
+        self.scene.robot = BOOSTER_T1_CFG.replace(
+            prim_path="{ENV_REGEX_NS}/Robot"
+        )
         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Waist"
 
-        # Randomization
+        # ------------------------------------------------------------------
+        # Disable over-randomization (early learning killer)
+        # ------------------------------------------------------------------
         self.events.push_robot = None
         self.events.add_base_mass = None
+        self.events.base_com = None
+
         self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
-        self.events.base_external_force_torque.params["asset_cfg"].body_names = ["Waist"]
+
         self.events.reset_base.params = {
-            "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "yaw": (-3.14, 3.14)},
+            "pose_range": {
+                "x": (-0.3, 0.3),
+                "y": (-0.3, 0.3),
+                "yaw": (-3.14, 3.14),
+            },
             "velocity_range": {
                 "x": (0.0, 0.0),
                 "y": (0.0, 0.0),
@@ -440,35 +658,25 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
                 "yaw": (0.0, 0.0),
             },
         }
-        self.events.base_com = None
 
-        # Rewards
-        self.rewards.lin_vel_z_l2.weight = 0.0
-        self.rewards.undesired_contacts = None
-        self.rewards.flat_orientation_l2.weight = -1.0
-        self.rewards.action_rate_l2.weight = -0.005
-        self.rewards.dof_acc_l2.weight = -1.25e-7
-        self.rewards.dof_acc_l2.params["asset_cfg"] = SceneEntityCfg(
-            "robot", joint_names=[".*_Hip_.*", ".*_Knee_Pitch"]
-        )
-        self.rewards.dof_torques_l2.weight = -1.5e-7
-        self.rewards.dof_torques_l2.params["asset_cfg"] = SceneEntityCfg(
-            "robot", joint_names=[".*_Hip_.*", ".*_Knee_Pitch", ".*_Ankle_.*"]
-        )
+        # ------------------------------------------------------------------
+        # Commands (NO SIDEWAYS WALKING INITIALLY)
+        # ------------------------------------------------------------------
+        self.commands.base_velocity.ranges.lin_vel_x = (0.4, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (-0.2, 0.2)
+        self.commands.base_velocity.ranges.ang_vel_z = (-0.6, 0.6)
 
-        # Commands
-        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
-
-        # terminations
+        # ------------------------------------------------------------------
+        # Termination tuning
+        # ------------------------------------------------------------------
         self.terminations.base_contact.params["sensor_cfg"].body_names = "Waist"
-        # adjust fallen detection to stair-friendly relative clearance
-        self.terminations.fallen.params["asset_cfg"].body_names = "Waist"
-        self.terminations.fallen.params["foot_names"] = ".*_foot_link"
-        self.terminations.fallen.params["min_clearance"] = 0.18
-        self.terminations.fallen.params["tilt_threshold"] = 0.9
-        self.terminations.fallen.params["persist_steps"] = 3
+        self.terminations.fallen.params.update(
+            dict(
+                min_clearance=0.18,
+                tilt_threshold=0.9,
+                persist_steps=3,
+            )
+        )
 
 
 @configclass
