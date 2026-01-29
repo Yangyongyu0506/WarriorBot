@@ -455,7 +455,7 @@ class T1Rewards:
 
     base_orientation = RewTerm(
         func=mdp.flat_orientation_l2,
-        weight=3.0,   # 必须大
+        weight=-3.0,   # 必须大
     )
 
     base_ang_vel = RewTerm(
