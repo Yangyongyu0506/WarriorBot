@@ -38,19 +38,19 @@ if TYPE_CHECKING:
 
 
 class MotionLoader:
-        """Load and expose motion data for tracking.
+    """Load and expose motion data for tracking.
 
-        Parameters
-        - motion_file: Path to `.npz` containing fields like `joint_pos`, `joint_vel`,
-            `body_pos_w`, `body_quat_w`, etc.
-        - track_body_names: Body names to track (subset and order define indices).
-        - track_joint_names: Joint names to track (subset and order define indices).
-        - default_motion_body_names/default_motion_joint_names: Fallback lists when the
-            motion file doesn't include names.
-        - tail_len: Number of frames at end excluded from resets (to avoid short tails).
-        - device: Torch device for tensors.
-        """
-        def __init__(self, motion_file: str,
+    Parameters
+    - motion_file: Path to `.npz` containing fields like `joint_pos`, `joint_vel`,
+        `body_pos_w`, `body_quat_w`, etc.
+    - track_body_names: Body names to track (subset and order define indices).
+    - track_joint_names: Joint names to track (subset and order define indices).
+    - default_motion_body_names/default_motion_joint_names: Fallback lists when the
+        motion file doesn't include names.
+    - tail_len: Number of frames at end excluded from resets (to avoid short tails).
+    - device: Torch device for tensors.
+    """
+    def __init__(self, motion_file: str,
                  track_body_names: Sequence[str],
                  track_joint_names: Sequence[str],
                  *,
@@ -442,20 +442,20 @@ class MotionCommand(CommandTerm):
 
 @configclass
 class MotionCommandCfg(CommandTermCfg):
-        """Configuration for motion tracking command.
+    """Configuration for motion tracking command.
 
-        Fields
-        - `asset_name`: Name of the articulated asset to control.
-        - `motion_file`: Path to motion `.npz` file.
-        - `anchor_body_name`: Body used as motion anchor (e.g., `Waist`).
-        - `body_names`: Body names to track (subset of robot bodies).
-        - `tail_len`: Number of frames excluded from sampling.
-        - `pose_range`/`velocity_range`: Randomization ranges for resets.
-        - `joint_position_range`: Uniform noise bounds applied on joint positions.
-        - Adaptive sampling parameters (`adaptive_*`): kernel size, decay factor,
-            uniform mix, and EMA update rate.
-        - Visualizer configs: marker scales for anchor and body frames.
-        """
+    Fields
+    - `asset_name`: Name of the articulated asset to control.
+    - `motion_file`: Path to motion `.npz` file.
+    - `anchor_body_name`: Body used as motion anchor (e.g., `Waist`).
+    - `body_names`: Body names to track (subset of robot bodies).
+    - `tail_len`: Number of frames excluded from sampling.
+    - `pose_range`/`velocity_range`: Randomization ranges for resets.
+    - `joint_position_range`: Uniform noise bounds applied on joint positions.
+    - Adaptive sampling parameters (`adaptive_*`): kernel size, decay factor,
+        uniform mix, and EMA update rate.
+    - Visualizer configs: marker scales for anchor and body frames.
+    """
 
     class_type: type = MotionCommand
 
