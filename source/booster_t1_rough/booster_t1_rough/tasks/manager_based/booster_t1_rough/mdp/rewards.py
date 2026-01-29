@@ -191,3 +191,49 @@ def double_support_penalty(
     cmd = env.command_manager.get_command(command_name)
     cmd_speed = torch.linalg.norm(cmd[:, :2], dim=1)
     return (both_contact & (cmd_speed >= min_speed)).float()
+
+
+def feet_gait(
+        env: ManagerBasedRLEnv,
+        period: float,
+        offset: list[float],
+        sensor_cfg: SceneEntityCfg,
+        threshold: float = 0.5,
+        command_name=None,
+    ) -> torch.Tensor:
+    """
+    Docstring for feet_gait
+    
+    :param env: Description
+    :type env: ManagerBasedRLEnv
+    :param period: Description
+    :type period: float
+    :param offset: Description
+    :type offset: list[float]
+    :param sensor_cfg: Description
+    :type sensor_cfg: SceneEntityCfg
+    :param threshold: Description
+    :type threshold: float
+    :param command_name: Description
+    :return: Description
+    :rtype: Tensor
+    """
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    is_contact = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids] > 0
+
+    global_phase = ((env.episode_length_buf * env.step_dt) % period / period).unsqueeze(1)
+    phases = []
+    for offset_ in offset:
+        phase = (global_phase + offset_) % 1.0
+        phases.append(phase)
+    leg_phase = torch.cat(phases, dim=-1)
+
+    reward = torch.zeros(env.num_envs, dtype=torch.float, device=env.device)
+    for i in range(len(sensor_cfg.body_ids)):
+        is_stance = leg_phase[:, i] < threshold
+        reward += ~(is_stance ^ is_contact[:, i])
+
+    if command_name is not None:
+        cmd_norm = torch.norm(env.command_manager.get_command(command_name), dim=1)
+        reward *= cmd_norm > 0.1
+    return reward

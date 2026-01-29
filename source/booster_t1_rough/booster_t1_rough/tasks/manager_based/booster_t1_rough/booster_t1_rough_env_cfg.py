@@ -28,6 +28,7 @@ import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
 from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
 from .mdp.events import sync_action_offsets_to_defaults
 from .mdp.terminations import is_fallen
+from .mdp.rewards import feet_gait
 # Pre-defined configs
 from .robots.booster import BOOSTER_T1_CFG  # isort: skip
 
@@ -314,6 +315,17 @@ class T1Rewards:
             "command_name": "base_velocity",
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
             "threshold": 0.4,
+        },
+    )
+    gait_phase = RewTerm( # 步态奖励
+        func=feet_gait,
+        weight=0.5,
+        params={
+            "period": 0.7,
+            "offset": [0.0, 0.5],
+            "threshold": 0.55,
+            "command_name": "base_velocity",
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
         },
     )
     # 其他
