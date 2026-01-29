@@ -152,3 +152,10 @@ tmux ls # 列出所有tmux会话
 tmux attach -t <session_name> # 重新连接到指定的tmux会话
 ```
 在tmux会话内，可以使用Ctrl+b然后按c创建新窗口，使用Ctrl+b然后按n或p切换窗口。
+### 调整远程服务器CPU模式
+查看当前CPU模式：
+```bash
+sudo apt install linux-tools-common linux-tools-$(uname -r)
+cpupower frequency-info # 查看当前CPU频率调节器
+sudo cpupower frequency-set -g performance # 设置为性能模式
+```
