@@ -216,6 +216,7 @@ class CurriculumCfg:
 @configclass
 class T1Rewards:
     """Reward terms for Booster T1 rough terrain locomotion."""
+    
     # 核心驱动力：速度跟踪（command ≠ 0 时，不动就是负反馈）
     track_lin_vel_xy = RewTerm(
         func=mdp.track_lin_vel_xy_yaw_frame_exp,
@@ -293,7 +294,7 @@ class T1Rewards:
     # 摆腿奖励
     hip_swing = RewTerm(
         func=mdp.joint_vel_l2,
-        weight=+0.02,
+        weight=+0.0005,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*Hip_Pitch.*"])}
     )
     # 能量 & 平滑
@@ -315,6 +316,8 @@ class T1Rewards:
             "threshold": 0.4,
         },
     )
+    # 其他
+    alive = RewTerm(func=mdp.is_alive, weight=0.01)
 
 @configclass
 class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
