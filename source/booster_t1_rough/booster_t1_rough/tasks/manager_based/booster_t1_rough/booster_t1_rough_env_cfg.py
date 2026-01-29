@@ -31,27 +31,6 @@ from .mdp.terminations import is_fallen
 # Pre-defined configs
 from .robots.booster import BOOSTER_T1_CFG  # isort: skip
 
-# Scene definition
-@configclass
-class BoosterT1RoughSceneCfg(InteractiveSceneCfg):
-    """Configuration for a cart-pole scene."""
-
-    # ground plane
-    ground = AssetBaseCfg(
-        prim_path="/World/ground",
-        spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)),
-    )
-
-    # robot
-    robot: ArticulationCfg = BOOSTER_T1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-
-    # lights
-    dome_light = AssetBaseCfg(
-        prim_path="/World/DomeLight",
-        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
-    )
-    
-# MDP settings
 @configclass
 class CommandsCfg:
     """Command specifications for the MDP."""
