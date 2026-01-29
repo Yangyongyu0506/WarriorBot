@@ -661,7 +661,7 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         # ------------------------------------------------------------------
         # Termination tuning
         # ------------------------------------------------------------------
-        self.terminations.base_contact.params["sensor_cfg"].body_names = "Trunk"
+        self.terminations.base_contact.params["sensor_cfg"].body_names = "H2"
         self.terminations.fallen.params.update(
             dict(
                 min_clearance=0.18,
