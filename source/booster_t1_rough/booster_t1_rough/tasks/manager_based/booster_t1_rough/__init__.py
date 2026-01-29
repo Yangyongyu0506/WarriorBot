@@ -3,6 +3,13 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""Booster T1 rough-terrain task registration and agent configs.
+
+This module registers the gym entry-point for the humanoid Booster T1
+rough-terrain velocity tracking task and ties in agent configuration
+entry points for training (RSL-RL PPO and SKRL variants).
+"""
+
 import gymnasium as gym
 
 from . import agents
