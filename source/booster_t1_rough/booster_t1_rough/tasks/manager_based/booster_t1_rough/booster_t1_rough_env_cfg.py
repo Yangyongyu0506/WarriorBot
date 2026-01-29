@@ -315,10 +315,6 @@ class T1Rewards:
         func=mdp.action_rate_l2,
         weight=-0.01,
     )
-    yaw_energy = RewTerm(
-        func=mdp.ang_vel_z_l2,
-        weight=-0.05,
-    )
     # 步态质量（强烈推荐）
     foot_air_time = RewTerm(
         func=mdp.feet_air_time,
