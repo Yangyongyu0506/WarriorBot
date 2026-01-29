@@ -229,7 +229,7 @@ class T1Rewards:
     )
     track_ang_vel_z = RewTerm(
         func=mdp.track_ang_vel_z_exp,
-        weight=0.8,
+        weight=1.2,
         params={
             "command_name": "base_velocity",
             "std": 0.5,
@@ -314,6 +314,10 @@ class T1Rewards:
     action_rate_penalty = RewTerm(
         func=mdp.action_rate_l2,
         weight=-0.01,
+    )
+    yaw_energy = RewTerm(
+        func=mdp.ang_vel_z_l2,
+        weight=-0.05,
     )
     # 步态质量（强烈推荐）
     foot_air_time = RewTerm(
