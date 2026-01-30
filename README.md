@@ -1,3 +1,6 @@
+## SPECIAL THANKS TO BOOSTER ROBOTICS FOR PROVIDING THIS TEMPLATE TO DEPLOY ROBOTICS POLICIES FOR WARRIOR COMPETITION PARTICIPANTS.
+## THE TASK "LOCO_ROUGH" IS FOR THE ISAACLAB RL PROJECT YANGY_RL ONLY.
+
 # Booster Deploy
 
 Booster Deploy is a lightweight deployment framework that supports running control policies on Booster robots (sim2real), MuJoCo (sim2sim), and Webots (internal sim2sim). The system adopts many well-established designs from IsaacLab to provide modular abstractions, allowing unified policy execution across both simulated and real robotic platforms.

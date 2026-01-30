@@ -3,7 +3,7 @@ from booster_deploy.utils.registry import register_task
 
 from .loco_rough import T1WalkControllerCfg
 
-"""这个任务专门适配基于booster_t1_rough强化学习的部署任务"""
+"""本任务专门适配基于booster_t1_rough强化学习的部署任务"""
 
 @configclass
 class T1RoughControllerCfg(T1WalkControllerCfg):
