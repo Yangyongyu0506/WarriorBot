@@ -280,7 +280,7 @@ def leg_joint_vel_symmetry_l2(
 
 
 
-################################## 特定于 Booster T1 Claw Rough 任务的奖励项 #####################################
+################################## 特定于 Booster T1 Rough Claw 任务的奖励项 #####################################
 def track_lin_vel_yz_body_exp(
     env: "ManagerBasedRLEnv", 
     std: float, 
