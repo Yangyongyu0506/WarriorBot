@@ -159,3 +159,7 @@ sudo apt install linux-tools-common linux-tools-$(uname -r)
 cpupower frequency-info # 查看当前CPU频率调节器
 sudo cpupower frequency-set -g performance # 设置为性能模式
 ```
+### 下载服务器上文件到本地
+```bash
+scp -r <username>@<ip>:/dir/to/file /dir/local
+```
