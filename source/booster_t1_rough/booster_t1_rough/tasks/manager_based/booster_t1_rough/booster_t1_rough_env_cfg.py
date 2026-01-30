@@ -221,7 +221,7 @@ class T1Rewards:
     # 核心驱动力：速度跟踪（command ≠ 0 时，不动就是负反馈）
     track_lin_vel_xy = RewTerm(
         func=mdp.track_lin_vel_xy_yaw_frame_exp,
-        weight=1.5,   # 比之前更强
+        weight=2.0,   # 比之前更强
         params={
             "command_name": "base_velocity",
             "std": 0.5,
