@@ -28,7 +28,7 @@ import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
 from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
 from .mdp.events import sync_action_offsets_to_defaults
 from .mdp.terminations import is_fallen
-from .mdp.rewards import feet_gait
+from .mdp.rewards import feet_gait, leg_joint_vel_symmetry_l2
 # Pre-defined configs
 from .robots.booster import BOOSTER_T1_CFG  # isort: skip
 
@@ -303,7 +303,7 @@ class T1Rewards:
     # 摆腿奖励
     hip_swing = RewTerm(
         func=mdp.joint_vel_l2,
-        weight=+0.0005,
+        weight=+0.01,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*Hip_Pitch.*"])}
     )
     # 能量 & 平滑
@@ -336,8 +336,24 @@ class T1Rewards:
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
         },
     )
+    leg_vel_symmetry = RewTerm( # 左右腿不对称速度惩罚
+        func=leg_joint_vel_symmetry_l2,
+        weight=-0.2, 
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*Hip_*.*"]),
+            "clip": 5.0, 
+        },
+    )          
     # 其他
-    alive = RewTerm(func=mdp.is_alive, weight=0.01)
+    alive = RewTerm(func=mdp.is_alive, weight=0.01) # 微弱的存活奖励
+    feet_slide = RewTerm( # 足端滑动惩罚
+        func=mdp.feet_slide,
+        weight=-0.2,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot_link"),
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
+        },
+    )
 
 @configclass
 class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
@@ -378,7 +394,7 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
             },
         }
         # Commands (NO SIDEWAYS WALKING INITIALLY)
-        self.commands.base_velocity.ranges.lin_vel_x = (0.4, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.2, 0.2)
         self.commands.base_velocity.ranges.ang_vel_z = (-0.6, 0.6)
         # Termination tuning

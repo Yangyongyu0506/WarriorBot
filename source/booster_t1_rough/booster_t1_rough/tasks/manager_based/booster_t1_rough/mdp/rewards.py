@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Union
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor
 from isaaclab.utils.math import quat_error_magnitude
+from isaaclab.assets import Articulation
+from isaaclab.envs import ManagerBasedRLEnv
 
 from booster_train.tasks.manager_based.beyond_mimic.mdp.commands import MotionCommand
 
@@ -200,24 +202,7 @@ def feet_gait(
         sensor_cfg: SceneEntityCfg,
         threshold: float = 0.5,
         command_name=None,
-    ) -> torch.Tensor:
-    """
-    Docstring for feet_gait
-    
-    :param env: Description
-    :type env: ManagerBasedRLEnv
-    :param period: Description
-    :type period: float
-    :param offset: Description
-    :type offset: list[float]
-    :param sensor_cfg: Description
-    :type sensor_cfg: SceneEntityCfg
-    :param threshold: Description
-    :type threshold: float
-    :param command_name: Description
-    :return: Description
-    :rtype: Tensor
-    """
+) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     is_contact = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids] > 0
 
@@ -236,4 +221,57 @@ def feet_gait(
     if command_name is not None:
         cmd_norm = torch.norm(env.command_manager.get_command(command_name), dim=1)
         reward *= cmd_norm > 0.1
+    return reward
+
+
+
+
+
+def leg_joint_vel_symmetry_l2(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    clip: float | None = None,
+) -> torch.Tensor:
+    asset: Articulation = env.scene[asset_cfg.name]
+
+    # ---------- cache joint index pairs ----------
+    if not hasattr(env, "_leg_vel_symmetry_cache"):
+        # 1. 用 regex 找到所有目标 joint indices
+        joint_ids, joint_names = asset.find_joints(asset_cfg.joint_names)
+
+        # 2. 按名字分左右腿（假设 L_/R_ 命名）
+        left = {}
+        right = {}
+
+        for jid, name in zip(joint_ids, joint_names):
+            if name.startswith("Left_"):
+                left[name[5:]] = jid
+            elif name.startswith("Right_"):
+                right[name[6:]] = jid
+
+        # 3. 取交集，形成 (L, R) index 对
+        pairs = []
+        for k in left.keys() & right.keys():
+            pairs.append((left[k], right[k]))
+
+        assert len(pairs) > 0, \
+            f"No left-right joint pairs found for {asset_cfg.joint_names}"
+
+        env._leg_vel_symmetry_cache = pairs
+
+    pairs = env._leg_vel_symmetry_cache
+
+    # ---------- compute reward ----------
+    vel = asset.data.joint_vel  # [num_envs, num_joints]
+    reward = torch.zeros(env.num_envs, device=env.device)
+
+    for l_id, r_id in pairs:
+        diff = vel[:, l_id] - vel[:, r_id]
+        reward += diff * diff
+
+    reward /= len(pairs)
+
+    if clip is not None:
+        reward = torch.clamp(reward, max=clip)
+
     return reward
