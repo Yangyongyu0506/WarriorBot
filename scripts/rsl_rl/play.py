@@ -151,6 +151,19 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     policy = runner.get_inference_policy(device=env.unwrapped.device)
 
     # extract the neural network module
+# 1. 使用 .unwrapped 穿透包装器
+    inner_env = env.unwrapped
+
+    # 2. 获取机器人对象 (注意这里的 key 必须和你的 SceneCfg 中定义的一致，通常是 "robot")
+    # 如果你之前在 Config 里写的是 self.scene.robot，这里通常是 "robot"
+    robot = inner_env.scene["robot"] 
+
+    # 3. 打印关键信息
+    print("="*30)
+    print("【核对关节顺序 - 重要】")
+    print(f"关节名称列表: {robot.data.joint_names}")
+    print(f"关节数量: {len(robot.data.joint_names)}")
+    print("="*30)
     # we do this in a try-except to maintain backwards compatibility.
     try:
         # version 2.3 onwards
