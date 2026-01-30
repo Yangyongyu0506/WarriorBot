@@ -362,7 +362,6 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
     terminations: TerminationsCfg = TerminationsCfg()
     observations: ObservationsCfg = ObservationsCfg()
     curriculum : CurriculumCfg = CurriculumCfg()
-    # scene: MySceneCfg = MySceneCfg()
     events: EventCfg = EventCfg()
     def __post_init__(self):
         super().__post_init__()
@@ -394,18 +393,18 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
             },
         }
         # Commands (NO SIDEWAYS WALKING INITIALLY)
-        self.commands.base_velocity.ranges.lin_vel_x = (0.4, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (0, 0)
+        self.commands.base_velocity.ranges.lin_vel_x = (0, 0.5)
+        self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
         # Termination tuning
-        # self.terminations.base_contact.params["sensor_cfg"].body_names = "H2"
-        # self.terminations.fallen.params.update(
-        #     dict(
-        #         min_clearance=0.18,
-        #         tilt_threshold=0.9,
-        #         persist_steps=3,
-        #     )
-        # )
+        self.terminations.base_contact.params["sensor_cfg"].body_names = "H2"
+        self.terminations.fallen.params.update(
+            dict(
+                min_clearance=0.18,
+                tilt_threshold=0.9,
+                persist_steps=3,
+            )
+        )
 
 @configclass
 class BoosterT1RoughEnvCfg_PLAY(BoosterT1RoughEnvCfg):
