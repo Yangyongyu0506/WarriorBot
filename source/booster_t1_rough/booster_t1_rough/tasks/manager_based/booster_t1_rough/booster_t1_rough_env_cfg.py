@@ -33,6 +33,34 @@ from .mdp.rewards import feet_gait, leg_joint_vel_symmetry_l2
 from .robots.booster import BOOSTER_T1_CFG  # isort: skip
 
 from .mdp.rewards import *
+from .mdp.terminations import *
+
+
+#### 定义爬行时的理想参考姿态（让四肢像四足动物一样分布）
+CRAWLING_POSE = {
+# 手臂：向前伸出撑地
+"Left_Shoulder_Pitch": -1.2,   # 根据限位 -3.29~1.18，负值通常是向前抬起
+"Right_Shoulder_Pitch": -1.2,
+"Left_Elbow_Pitch": 0.5,      # 肘部微弯
+"Right_Elbow_Pitch": 0.5,
+    
+# 腿部：深度弯曲呈爬行状
+"Left_Hip_Pitch": -1.2,
+"Right_Hip_Pitch": -1.2,
+"Left_Knee_Pitch": 1.8,       # 膝盖大幅弯曲（接近限位 2.18）
+"Right_Knee_Pitch": 1.8,
+"Left_Ankle_Pitch": -0.5,
+"Right_Ankle_Pitch": -0.5,
+    
+# 躯干：保持直线
+"Waist": 0.0,
+}
+
+# 必须完全匹配 URDF 中的 link name
+EXTREMITIES_NAME = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
+
+
+
 
 @configclass
 class CommandsCfg:
@@ -196,32 +224,32 @@ class TerminationsCfg:
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
-    # 1. 接触检查：除了 Trunk (躯干)，建议加上 Head (如果有的话)
-    # 爬行时，手肘和膝盖接触通常是允许的，但躯干和头部撞地应视为失败
+    # 1. 接触检查（这个 mdp.illegal_contact 在 locomotion.mdp 里有，可以保留）
     base_contact = DoneTerm(
-    func=mdp.illegal_contact,
-    params={
-        "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["Trunk", "H1", "H2"]), 
-        "threshold": 1.0
-    },
+        func=mdp.illegal_contact,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["H1", "H2"]), 
+            "threshold": 1.0
+        },
     )
 
-    # 2. 翻转检查 (Flipped)：防止机器人肚皮朝天
-    # 利用重力投影：如果本体 X 轴方向的重力投影变为负数，说明胸口朝天了
+    # 2. 翻转检查
+    # 修改：直接使用本地函数 bad_orientation，去掉 mdp. 前缀
     bad_orientation = DoneTerm(
-        func=mdp.bad_orientation,
+        func=bad_orientation, 
         params={
-            "limit_angle": 1.0, # 弧度，约 57度。如果侧倾超过这个角度就重置
+            "limit_angle": 1.0,
             "asset_cfg": SceneEntityCfg("robot")
         },
     )
 
-    # 3. 高度检查 (Low Height)：防止彻底趴窝
-    # 虽然爬行很低，但如果 Waist (腰部) 低于某个极值（比如 5cm），说明四肢已经支撑不住了
+    # 3. 高度检查
+    # 修改：直接使用本地函数 root_height_below，去掉 mdp. 前缀
     root_height_below = DoneTerm(
-        func=mdp.root_height_below,
+        func=root_height_below,
         params={"threshold": 0.08, "asset_cfg": SceneEntityCfg("robot")},
     )
+
 
 
 
@@ -257,6 +285,16 @@ class T1Rewards:
         },
     )
 
+    # 添加：躯干接触地面惩罚（不终止，但扣分）
+    trunk_contact_penalty = RewTerm(
+        func=mdp.contact_forces,
+        weight=-0.1, # 负权重
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names="Trunk"),
+            "threshold": 1.0,
+        },
+    )
+
     # 姿态奖励（防止翻滚或抬起头）
     base_orientation = RewTerm(
         func=crawling_orientation_l2, # 使用刚刚定义的函数
@@ -282,25 +320,7 @@ class T1Rewards:
     )
 
 
-    #### 定义爬行时的理想参考姿态（让四肢像四足动物一样分布）
-    CRAWLING_POSE = {
-    # 手臂：向前伸出撑地
-    "Left_Shoulder_Pitch": -1.2,   # 根据限位 -3.29~1.18，负值通常是向前抬起
-    "Right_Shoulder_Pitch": -1.2,
-    "Left_Elbow_Pitch": 0.5,      # 肘部微弯
-    "Right_Elbow_Pitch": 0.5,
     
-    # 腿部：深度弯曲呈爬行状
-    "Left_Hip_Pitch": -1.2,
-    "Right_Hip_Pitch": -1.2,
-    "Left_Knee_Pitch": 1.8,       # 膝盖大幅弯曲（接近限位 2.18）
-    "Right_Knee_Pitch": 1.8,
-    "Left_Ankle_Pitch": -0.5,
-    "Right_Ankle_Pitch": -0.5,
-    
-    # 躯干：保持直线
-    "Waist": 0.0,
-    }
 
     # 动态关节偏离惩罚：智能切换站立/爬行参考点
     joint_deviation_dynamic = RewTerm(
@@ -330,9 +350,6 @@ class T1Rewards:
     )
 
 
-
-    # 必须完全匹配 URDF 中的 link name
-    EXTREMITIES_NAME = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
 
     
     # --- 摆动奖励：鼓励四肢迈步 ---

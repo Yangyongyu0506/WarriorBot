@@ -120,3 +120,25 @@ def is_fallen(
         env._fallen_counter = torch.zeros(env.num_envs, dtype=torch.int32, device=env.device)
     env._fallen_counter = torch.where(fallen_now, env._fallen_counter + 1, torch.zeros_like(env._fallen_counter))
     return env._fallen_counter >= persist_steps
+
+from isaaclab.utils.math import quat_rotate_inverse # 注意这里是 inverse
+
+
+
+def root_height_below(env: "ManagerBasedRLEnv", threshold: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """如果机器人质心高度低于阈值，则终止。"""
+    asset = env.scene[asset_cfg.name]
+    # root_pos_w 是包含 [x, y, z] 的世界坐标，这是 ArticulationData 拥有的属性
+    return asset.data.root_pos_w[:, 2] < threshold
+
+def bad_orientation(env: "ManagerBasedRLEnv", limit_angle: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """只有当机器人彻底翻车（背部着地）时才终止。"""
+    asset = env.scene[asset_cfg.name]
+    gravity_vec = torch.tensor([0.0, 0.0, -1.0], device=env.device).repeat(env.num_envs, 1)
+    projected_gravity = quat_rotate_inverse(asset.data.root_quat_w, gravity_vec)
+    
+    # 爬行是 gx ≈ 1.0
+    # 站立是 gx ≈ 0.0
+    # 肚皮朝天是 gx ≈ -1.0
+    # 修正：只有当 gx < -0.2 (开始向后翻倒) 时才终止
+    return projected_gravity[:, 0] < -0.2

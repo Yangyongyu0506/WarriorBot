@@ -19,6 +19,8 @@ from isaaclab.envs import ManagerBasedRLEnv
 
 from booster_train.tasks.manager_based.beyond_mimic.mdp.commands import MotionCommand
 
+from isaaclab.utils.math import quat_error_magnitude, quat_rotate_inverse # 添加 quat_rotate_inverse
+
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
@@ -281,42 +283,24 @@ def leg_joint_vel_symmetry_l2(
 
 
 ################################## 特定于 Booster T1 Rough Claw 任务的奖励项 #####################################
+
+def _get_projected_gravity(env, asset):
+    """助手函数：手动计算重力投影"""
+    gravity_vec = torch.tensor([0.0, 0.0, -1.0], device=env.device).repeat(env.num_envs, 1)
+    return quat_rotate_inverse(asset.data.root_quat_w, gravity_vec)
+
 def track_lin_vel_yz_body_exp(
     env: "ManagerBasedRLEnv", 
     std: float, 
     command_name: str, 
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
-    """奖励机器人本体坐标系下的 Z 速度跟踪指令 X，Y 速度跟踪指令 Y。
-    
-    适用于爬行模式：
-    - 指令 X (前进) -> 对应机器人本地 Z 轴
-    - 指令 Y (侧移) -> 对应机器人本地 Y 轴
-    """
-    # 1. 获取指令 (通常是 [vx, vy, wz])，提取前两个元素 [vx, vy]
     command = env.command_manager.get_command(command_name)[:, :2]
-    
-    # 2. 获取机器人资产
     asset = env.scene[asset_cfg.name]
-    
-    # 3. 获取本体坐标系下的线速度 (root_lin_vel_b 包含 [vx, vy, vz])
-    # 在爬行位姿下：
-    # vel_b[:, 0] 是原胸口方向 (现在指向地面)
-    # vel_b[:, 1] 是原左侧方向 (现在依然是侧向)
-    # vel_b[:, 2] 是原头顶方向 (现在指向前方)
     vel_b = asset.data.root_lin_vel_b
-    
-    # 4. 提取当前的 [前向, 侧向] 速度，即 [Body_Z, Body_Y]
     actual_vel_yz = vel_b[:, [2, 1]]
-    
-    # 5. 计算平方误差
     error = torch.sum(torch.square(command - actual_vel_yz), dim=1)
-    
-    # 6. 返回指数奖励
     return torch.exp(-error / (std**2))
-
-
-
 
 def track_ang_vel_x_body_exp(
     env: "ManagerBasedRLEnv", 
@@ -324,92 +308,55 @@ def track_ang_vel_x_body_exp(
     command_name: str, 
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
-    # 1. 获取指令中的 wz (转向)
     command_wz = env.command_manager.get_command(command_name)[:, 2]
-    
-    # 2. 获取机器人资产
     asset = env.scene[asset_cfg.name]
-    
-    # 3. 获取本体坐标系下的角速度 [wx, wy, wz]
     ang_vel_b = asset.data.root_ang_vel_b
-    
-    # 4. 【关键修正】：由于本体 X 轴指向地面，
-    # 世界坐标系的 +Yaw 对应本体坐标系的 -wx
-    actual_yaw_vel = -ang_vel_b[:, 0]  # 注意这个负号
-    
-    # 5. 计算平方误差
+    actual_yaw_vel = -ang_vel_b[:, 0]
     error = torch.square(command_wz - actual_yaw_vel)
     return torch.exp(-error / (std**2))
-
 
 def crawling_orientation_l2(
     env: "ManagerBasedRLEnv", 
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
-    """惩罚身体姿态偏离'脸朝下'的水平爬行姿态。
-    
-    在理想爬行姿态下：
-    - 重力向量 (0,0,-1) 在本体坐标系应投影为 (1, 0, 0)
-    - 我们惩罚重力在本体 Y 和 Z 轴上的分量
-    """
-    # 获取重力投影 (n_envs, 3) -> [gx, gy, gz]
-    projected_gravity = env.scene[asset_cfg.name].data.projected_gravity
-    
-    # 惩罚 gy 和 gz 的大小（即身体倾斜或翻滚）
-    # projected_gravity[:, [1, 2]] 提取 Y 和 Z 分量
+    asset = env.scene[asset_cfg.name]
+    # 手动计算
+    projected_gravity = _get_projected_gravity(env, asset)
     return torch.sum(torch.square(projected_gravity[:, [1, 2]]), dim=1)
-
-
 
 def crawling_gated_ang_vel_yz_l2(
     env: "ManagerBasedRLEnv", 
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
-    """门控角速度惩罚：只有当身体趋于水平时，才惩罚晃动。"""
     asset = env.scene[asset_cfg.name]
-    # 获取重力在 Body X 上的投影 (站在 0 左右，趴在 1 左右)
-    # 我们取 max(0, gx)，确保只有当身体向前倒时才开始计算惩罚
-    gate = torch.clamp(asset.data.projected_gravity[:, 0], min=0.0)
-    
-    # 计算原本的惩罚
+    # 手动计算
+    projected_gravity = _get_projected_gravity(env, asset)
+    gate = torch.clamp(projected_gravity[:, 0], min=0.0)
     ang_vel_b = asset.data.root_ang_vel_b
     penalty = torch.sum(torch.square(ang_vel_b[:, [1, 2]]), dim=1)
-    
-    # 门控：站立时 gate=0, 惩罚为0；趴下时 gate=1, 全额惩罚
     return gate * penalty
 
 def crawling_gated_lin_vel_x_l2(
     env: "ManagerBasedRLEnv", 
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
-    """门控线速度惩罚：只有当身体趋于水平时，才惩罚垂直颠簸。"""
     asset = env.scene[asset_cfg.name]
-    gate = torch.clamp(asset.data.projected_gravity[:, 0], min=0.0)
-    
+    # 手动计算
+    projected_gravity = _get_projected_gravity(env, asset)
+    gate = torch.clamp(projected_gravity[:, 0], min=0.0)
     lin_vel_b = asset.data.root_lin_vel_b
     penalty = torch.square(lin_vel_b[:, 0])
-    
     return gate * penalty
 
-
-
-#能够识别当前“姿态目标”的门控函数
 def crawling_gated_joint_deviation(
     env: "ManagerBasedRLEnv",
     asset_cfg: SceneEntityCfg,
     crawling_pose_dict: dict
 ) -> torch.Tensor:
-    """动态关节偏离惩罚：在站立和爬行姿态之间平滑切换。
-    
-    Args:
-        crawling_pose_dict: 爬行状态下的目标关节位置 (Dict[str, float])
-    """
     asset = env.scene[asset_cfg.name]
     curr_joint_pos = asset.data.joint_pos
-    default_stand_pos = asset.data.default_joint_pos # 机器人默认的站立姿态
+    default_stand_pos = asset.data.default_joint_pos
     
-    # 1. 构造爬行姿态的 Tensor (需要与当前关节顺序对应)
-    # 这一步通常在初始化时做更好，但为了演示逻辑直接写在这里
     crawling_target = default_stand_pos.clone()
     joint_names = asset.joint_names
     for name, pos in crawling_pose_dict.items():
@@ -417,12 +364,9 @@ def crawling_gated_joint_deviation(
             idx = joint_names.index(name)
             crawling_target[:, idx] = pos
 
-    # 2. 计算门控 (gate): gx = 0 (站立), gx = 1 (趴下)
-    gate = torch.clamp(asset.data.projected_gravity[:, 0], min=0.0, max=1.0).unsqueeze(1)
+    # 手动计算
+    projected_gravity = _get_projected_gravity(env, asset)
+    gate = torch.clamp(projected_gravity[:, 0], min=0.0, max=1.0).unsqueeze(1)
 
-    # 3. 计算当前目标 (在站立和爬行目标之间线性插值)
-    # 站立时目标是 default_stand_pos，趴下时目标是 crawling_target
     dynamic_target = (1.0 - gate) * default_stand_pos + gate * crawling_target
-
-    # 4. 计算 L1 偏离
     return torch.sum(torch.abs(curr_joint_pos - dynamic_target), dim=1)
