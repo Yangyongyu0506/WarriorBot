@@ -215,17 +215,20 @@ class CurriculumCfg:
 
 @configclass
 class T1Rewards:
-    """Reward terms for Booster T1 rough terrain locomotion."""
-    
-    # 核心驱动力：速度跟踪（command ≠ 0 时，不动就是负反馈）
+    """Reward terms for Booster T1 locomotion (anti-jitter, hardware-safe)."""
+
+    # =====================================================
+    # 1. 核心任务奖励：速度跟踪
+    # =====================================================
     track_lin_vel_xy = RewTerm(
         func=mdp.track_lin_vel_xy_yaw_frame_exp,
-        weight=2.0,   # 比之前更强
+        weight=2.0,
         params={
             "command_name": "base_velocity",
             "std": 0.5,
         },
     )
+
     track_ang_vel_z = RewTerm(
         func=mdp.track_ang_vel_z_exp,
         weight=1.2,
@@ -234,22 +237,68 @@ class T1Rewards:
             "std": 0.5,
         },
     )
-    # Base 姿态（防佝偻）
+
+    # =====================================================
+    # 2. Base 稳定性（防侧弯、防抖根）
+    # =====================================================
     base_orientation = RewTerm(
         func=mdp.flat_orientation_l2,
-        weight=-3.0,   # 必须大
+        weight=-3.0,
     )
+
     base_ang_vel = RewTerm(
         func=mdp.ang_vel_xy_l2,
         weight=-0.15,
     )
-    # 垂直速度惩罚
+
     base_lin_vel = RewTerm(
         func=mdp.lin_vel_z_l2,
         weight=-2.0,
     )
-    # 关节偏离惩罚（分组）
-    # 腰 + 脖子：极强
+
+    # =====================================================
+    # 3. 上肢「帕金森终结者」—— 核心三板斧
+    # =====================================================
+
+    # 3.1 上肢角速度惩罚（最重要）
+    upper_body_joint_vel = RewTerm(
+        func=mdp.joint_vel_l2,
+        weight=-1.0,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "AAHead_.*",
+                    "Head_.*",
+                    ".*Shoulder_.*",
+                    ".*Elbow_.*",
+                ],
+            )
+        },
+    )
+
+    # 3.3 上肢力矩惩罚（防烧电机，真机必备）
+    upper_body_torque_penalty = RewTerm(
+        func=mdp.joint_torques_l2,
+        weight=-5e-4,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "AAHead_.*",
+                    "Head_.*",
+                    ".*Shoulder_.*",
+                    ".*Elbow_.*",
+                ],
+            )
+        },
+    )
+
+    # =====================================================
+    # 4. 关节偏离惩罚（结构姿态约束）
+    # =====================================================
+
+    # 躯干 + 颈部（强）
     torso_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
         weight=-1.0,
@@ -264,7 +313,8 @@ class T1Rewards:
             )
         },
     )
-    # 手臂：中等
+
+    # 手臂（中）
     arm_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
         weight=-0.6,
@@ -272,19 +322,16 @@ class T1Rewards:
             "asset_cfg": SceneEntityCfg(
                 "robot",
                 joint_names=[
-                    "Left_Shoulder_Pitch",
-                    "Left_Shoulder_Roll",
-                    "Left_Elbow_Pitch",
-                    "Left_Elbow_Yaw",
-                    "Right_Shoulder_Pitch",
-                    "Right_Shoulder_Roll",
-                    "Right_Elbow_Pitch",
-                    "Right_Elbow_Yaw",
+                    "Left_Shoulder_.*",
+                    "Right_Shoulder_.*",
+                    "Left_Elbow_.*",
+                    "Right_Elbow_.*",
                 ],
             )
         },
     )
-    # 腿：弱（允许迈步）
+
+    # 腿（弱，允许迈步）
     leg_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
         weight=-0.1,
@@ -299,32 +346,33 @@ class T1Rewards:
             )
         },
     )
-    # 摆腿奖励
+
+    # =====================================================
+    # 5. 步态与腿部动力学
+    # =====================================================
     hip_swing = RewTerm(
         func=mdp.joint_vel_l2,
         weight=+0.01,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*Hip_Pitch.*"])}
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot", joint_names=[".*Hip_Pitch.*"]
+            )
+        },
     )
-    # 能量 & 平滑
-    joint_torque_penalty = RewTerm(
-        func=mdp.joint_torques_l2,
-        weight=-2.0e-5,
-    )
-    action_rate_penalty = RewTerm(
-        func=mdp.action_rate_l2,
-        weight=-0.01,
-    )
-    # 步态质量（强烈推荐）
+
     foot_air_time = RewTerm(
         func=mdp.feet_air_time,
         weight=0.2,
         params={
             "command_name": "base_velocity",
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces", body_names=".*_foot_link"
+            ),
             "threshold": 0.4,
         },
     )
-    gait_phase = RewTerm( # 步态奖励
+
+    gait_phase = RewTerm(
         func=feet_gait,
         weight=0.5,
         params={
@@ -332,26 +380,52 @@ class T1Rewards:
             "offset": [0.0, 0.5],
             "threshold": 0.55,
             "command_name": "base_velocity",
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces", body_names=".*_foot_link"
+            ),
         },
     )
-    leg_vel_symmetry = RewTerm( # 左右腿不对称速度惩罚
+
+    leg_vel_symmetry = RewTerm(
         func=leg_joint_vel_symmetry_l2,
-        weight=-0.2, 
+        weight=-0.2,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*Hip_*.*"]),
-            "clip": 5.0, 
+            "asset_cfg": SceneEntityCfg(
+                "robot", joint_names=[".*Hip_.*"]
+            ),
+            "clip": 5.0,
         },
-    )          
-    # 其他
-    alive = RewTerm(func=mdp.is_alive, weight=0.01) # 微弱的存活奖励
-    feet_slide = RewTerm( # 足端滑动惩罚
+    )
+
+    # =====================================================
+    # 6. 能量与安全
+    # =====================================================
+    joint_torque_penalty = RewTerm(
+        func=mdp.joint_torques_l2,
+        weight=-2.0e-5,
+    )
+
+    action_rate_penalty = RewTerm(
+        func=mdp.action_rate_l2,
+        weight=-0.01,
+    )
+
+    feet_slide = RewTerm(
         func=mdp.feet_slide,
         weight=-0.2,
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot_link"),
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot_link"),
+            "asset_cfg": SceneEntityCfg(
+                "robot", body_names=".*_foot_link"
+            ),
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces", body_names=".*_foot_link"
+            ),
         },
+    )
+
+    alive = RewTerm(
+        func=mdp.is_alive,
+        weight=0.01,
     )
 
 @configclass

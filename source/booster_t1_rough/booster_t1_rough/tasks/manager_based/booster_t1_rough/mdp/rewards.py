@@ -224,9 +224,6 @@ def feet_gait(
     return reward
 
 
-
-
-
 def leg_joint_vel_symmetry_l2(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg,
