@@ -394,7 +394,7 @@ class RewardsCfg:
     # ---- (5) 强制两腿受力对称 ----
     support_force_balance = RewTerm(
         func=support_force_balance,
-        weight=-2.0,
+        weight=-3.0,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces", body_names=["left_foot_link", "right_foot_link"]
@@ -475,7 +475,7 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
             },
         }
         # Commands (NO SIDEWAYS WALKING INITIALLY)
-        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (0.0, 0.0)
         self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
         # Termination tuning
