@@ -222,7 +222,7 @@ class RewardsCfg:
     # =========================================================
     track_lin_vel_xy = RewTerm(
         func=mdp.track_lin_vel_xy_yaw_frame_exp,
-        weight=2.0,
+        weight=3.0,
         params={
             "command_name": "base_velocity",
             "std": 0.5,
@@ -231,7 +231,7 @@ class RewardsCfg:
 
     track_ang_vel_z = RewTerm(
         func=mdp.track_ang_vel_z_exp,
-        weight=1.0,
+        weight=3.0,
         params={
             "command_name": "base_velocity",
             "std": 0.5,
@@ -393,7 +393,7 @@ class RewardsCfg:
     # ---- (5) 强制两腿受力对称 ----
     support_force_balance = RewTerm(
         func=support_force_balance,
-        weight=-0.5,
+        weight=-2.0,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces", body_names=["left_foot_link", "right_foot_link"]
@@ -419,7 +419,7 @@ class RewardsCfg:
     # =========================================================
     feet_slide = RewTerm(
         func=mdp.feet_slide,
-        weight=-0.15,
+        weight=-0.3,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot", body_names=".*_foot_link"
