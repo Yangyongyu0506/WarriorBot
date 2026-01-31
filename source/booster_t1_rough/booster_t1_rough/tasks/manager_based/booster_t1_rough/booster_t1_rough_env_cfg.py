@@ -340,7 +340,7 @@ class T1Rewards:
         func=leg_joint_vel_symmetry_l2,
         weight=-0.2, 
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*Hip_*.*"]),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*Hip_Pitch.*"]),
             "clip": 5.0, 
         },
     )          

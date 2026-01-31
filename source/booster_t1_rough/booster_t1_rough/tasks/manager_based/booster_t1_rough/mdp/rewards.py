@@ -263,7 +263,7 @@ def leg_joint_vel_symmetry_l2(
     reward = torch.zeros(env.num_envs, device=env.device)
 
     for l_id, r_id in pairs:
-        diff = vel[:, l_id] - vel[:, r_id]
+        diff = vel[:, l_id] + vel[:, r_id]
         reward += diff * diff
 
     reward /= len(pairs)
