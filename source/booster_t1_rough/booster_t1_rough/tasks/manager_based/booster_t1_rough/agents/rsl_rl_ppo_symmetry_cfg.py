@@ -38,40 +38,46 @@ def _act_mirror_fn(act: torch.Tensor) -> torch.Tensor:
         device=act.device,
     )
 
-    return act[:, booster_joint_mirror_map] * negate_mask
+    act_m = act[:, booster_joint_mirror_map] * negate_mask
+
+    return torch.nan_to_num(
+        act_m, nan=0.0, posinf=0.0, neginf=0.0
+    )   
 
 
 def _obs_mirror_fn(obs_td):
-    """
-    obs_td: TensorDict with keys ["policy", "critic"]
-    """
-    obs_td = obs_td.clone()
+    # 深拷贝 TensorDict + tensor
+    obs_td_m = obs_td.clone(False)
 
-    policy_obs = obs_td["policy"]   # [N, obs_dim]
-    policy_obs_mirror = policy_obs.clone()
+    policy_obs = obs_td["policy"]
+    policy_obs_m = policy_obs.clone()
 
-    # ===== 1. base_ang_vel (wx, wy, wz) =====
-    # 假设 index [0:3]
-    policy_obs_mirror[:, 0] *= -1   # wx
-    policy_obs_mirror[:, 2] *= -1   # wz
+    # base_ang_vel
+    policy_obs_m[:, 0] *= -1
+    policy_obs_m[:, 2] *= -1
 
-    # ===== 2. projected_gravity (gx, gy, gz) =====
-    # 假设 [3:6]
-    policy_obs_mirror[:, 4] *= -1   # gy
+    # projected gravity
+    policy_obs_m[:, 4] *= -1
 
-    # ===== 3. velocity command =====
-    # 假设 [6:9]
-    policy_obs_mirror[:, 7] *= -1   # vy
-    policy_obs_mirror[:, 8] *= -1   # wz
+    # command
+    policy_obs_m[:, 7] *= -1
+    policy_obs_m[:, 8] *= -1
 
-    # ===== 4. joint_pos / joint_vel / last_action =====
-    # 直接用你已经写好的 joint mirror
-    policy_obs_mirror[:, 9:32] = _act_mirror_fn(policy_obs[:, 9:32])
-    policy_obs_mirror[:, 32:55] = _act_mirror_fn(policy_obs[:, 32:55])
-    policy_obs_mirror[:, 55:78] = _act_mirror_fn(policy_obs[:, 55:78])
+    # joint pos / vel
+    policy_obs_m[:, 9:32]  = _act_mirror_fn(policy_obs[:, 9:32])
+    policy_obs_m[:, 32:55] = _act_mirror_fn(policy_obs[:, 32:55])
 
-    obs_td["policy"] = policy_obs_mirror
-    return obs_td
+    # ⚠️ 强烈建议 crawl 阶段不 mirror last_action
+    # policy_obs_m[:, 55:78] = _act_mirror_fn(policy_obs[:, 55:78])
+
+    # 数值防护（关键）
+    policy_obs_m = torch.nan_to_num(
+        policy_obs_m, nan=0.0, posinf=0.0, neginf=0.0
+    )
+
+    obs_td_m.set_("policy", policy_obs_m)
+
+    return obs_td_m
 
 
 
@@ -123,6 +129,6 @@ class PPOSymmetryRunnerCfg(RslRlOnPolicyRunnerCfg):
             use_data_augmentation=True,
             use_mirror_loss=True,
             data_augmentation_func=crawl_symmetry_augmentation,
-            mirror_loss_coeff=0.2,
+            mirror_loss_coeff=0.05,
         ),
     )
