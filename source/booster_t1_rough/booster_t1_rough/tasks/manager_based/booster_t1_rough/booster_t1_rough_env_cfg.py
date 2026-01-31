@@ -368,7 +368,7 @@ class RewardsCfg:
     # ---- (3) swing 脚高度：不准假摆 ----
     swing_foot_height = RewTerm(
         func=swing_foot_height_bonus,
-        weight=0.12,
+        weight=0.5,
         params={
             "height_margin": 0.1,
             "sensor_cfg": SceneEntityCfg(
@@ -380,7 +380,7 @@ class RewardsCfg:
     # ---- (4) 强制把脚分开，防止自干涉 ----
     feet_separation = RewTerm(
         func=feet_lateral_separation_exp,
-        weight=5.0,
+        weight=0.5,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot", body_names=["left_foot_link", "right_foot_link"]
