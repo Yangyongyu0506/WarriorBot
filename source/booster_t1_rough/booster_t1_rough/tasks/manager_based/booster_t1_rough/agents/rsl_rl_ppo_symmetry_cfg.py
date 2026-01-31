@@ -41,26 +41,38 @@ def _act_mirror_fn(act: torch.Tensor) -> torch.Tensor:
     return act[:, booster_joint_mirror_map] * negate_mask
 
 
-def _obs_mirror_fn(obs):
-    obs_mirror = obs.clone()
+def _obs_mirror_fn(obs_td):
+    """
+    obs_td: TensorDict with keys ["policy", "critic"]
+    """
+    obs_td = obs_td.clone()
 
-    # === base angular velocity (body frame) ===
-    obs_mirror["base_ang_vel"][:, 0] *= -1   # wx
-    obs_mirror["base_ang_vel"][:, 2] *= -1   # wz
+    policy_obs = obs_td["policy"]   # [N, obs_dim]
+    policy_obs_mirror = policy_obs.clone()
 
-    # === projected gravity ===
-    obs_mirror["projected_gravity"][:, 1] *= -1
+    # ===== 1. base_ang_vel (wx, wy, wz) =====
+    # 假设 index [0:3]
+    policy_obs_mirror[:, 0] *= -1   # wx
+    policy_obs_mirror[:, 2] *= -1   # wz
 
-    # === command ===
-    obs_mirror["command"][:, 0] *= 1         # vx
-    obs_mirror["command"][:, 1] *= -1        # vy
-    obs_mirror["command"][:, 2] *= -1        # wz
+    # ===== 2. projected_gravity (gx, gy, gz) =====
+    # 假设 [3:6]
+    policy_obs_mirror[:, 4] *= -1   # gy
 
-    # === joint pos / vel / last action ===
-    for k in ["joint_pos", "joint_vel", "last_action"]:
-        obs_mirror[k] = _act_mirror_fn(obs[k])
+    # ===== 3. velocity command =====
+    # 假设 [6:9]
+    policy_obs_mirror[:, 7] *= -1   # vy
+    policy_obs_mirror[:, 8] *= -1   # wz
 
-    return obs_mirror
+    # ===== 4. joint_pos / joint_vel / last_action =====
+    # 直接用你已经写好的 joint mirror
+    policy_obs_mirror[:, 9:32] = _act_mirror_fn(policy_obs[:, 9:32])
+    policy_obs_mirror[:, 32:55] = _act_mirror_fn(policy_obs[:, 32:55])
+    policy_obs_mirror[:, 55:78] = _act_mirror_fn(policy_obs[:, 55:78])
+
+    obs_td["policy"] = policy_obs_mirror
+    return obs_td
+
 
 
 def crawl_symmetry_augmentation(
@@ -69,16 +81,15 @@ def crawl_symmetry_augmentation(
     actions,
 ):
     obs_mirror = None
-    action_mirror = None
+    actions_mirror = None
 
     if obs is not None:
         obs_mirror = _obs_mirror_fn(obs)
 
-    if action is not None:
-        action_mirror = _act_mirror_fn(action)
+    if actions is not None:
+        actions_mirror = _act_mirror_fn(actions)
 
-    return obs_mirror, action_mirror
-
+    return obs_mirror, actions_mirror
 
 
 @configclass
