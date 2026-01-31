@@ -1,0 +1,53 @@
+--- git status ---
+On branch HenryHe
+Your branch is up to date with 'origin/HenryHe'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-02-41/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-14-38/
+	outputs/2026-01-31/
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+index 7d5fde4..fc0dcdd 100644
+--- a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
++++ b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+@@ -235,13 +235,13 @@ class TerminationsCfg:
+ 
+     # 2. 翻转检查
+     # 修改：直接使用本地函数 bad_orientation，去掉 mdp. 前缀
+-    bad_orientation = DoneTerm(
+-        func=bad_orientation, 
+-        params={
+-            "limit_angle": 1.0,
+-            "asset_cfg": SceneEntityCfg("robot")
+-        },
+-    )
++    # bad_orientation = DoneTerm(
++    #     func=bad_orientation, 
++    #     params={
++    #         "limit_angle": 1.0,
++    #         "asset_cfg": SceneEntityCfg("robot")
++    #     },
++    # )
+ 
+     # 3. 高度检查
+     # 修改：直接使用本地函数 root_height_below，去掉 mdp. 前缀
+@@ -480,7 +480,7 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+         # 这样可以保护头部不撞击地面
+         
+         # 将原本的 fallen 逻辑阈值下调，适应爬行高度
+-        self.terminations.root_height_below.params["threshold"] = 0.08
++        self.terminations.root_height_below.params["threshold"] = 0.06
+ 
+ 
+ @configclass

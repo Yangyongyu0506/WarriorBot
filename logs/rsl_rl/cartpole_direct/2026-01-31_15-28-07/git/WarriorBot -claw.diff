@@ -1,0 +1,428 @@
+--- git status ---
+On branch HenryHe
+Your branch is up to date with 'origin/HenryHe'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+	modified:   source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/mdp/rewards.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-02-41/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-14-38/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-20-09/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-40-01/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-42-26/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-44-03/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-45-05/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-46-11/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-50-13/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-51-05/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-52-49/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-59-58/
+	logs/rsl_rl/cartpole_direct/2026-01-31_15-07-42/
+	logs/rsl_rl/cartpole_direct/2026-01-31_15-12-00/
+	logs/rsl_rl/cartpole_direct/2026-01-31_15-15-25/
+	logs/rsl_rl/cartpole_direct/2026-01-31_15-16-39/
+	logs/rsl_rl/cartpole_direct/2026-01-31_15-22-54/
+	logs/rsl_rl/cartpole_direct/2026-01-31_15-28-07/
+	outputs/2026-01-31/
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+index 7d5fde4..d585e9d 100644
+--- a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
++++ b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+@@ -38,24 +38,33 @@ from .mdp.terminations import *
+ 
+ #### 定义爬行时的理想参考姿态（让四肢像四足动物一样分布）
+ CRAWLING_POSE = {
+-# 手臂：向前伸出撑地
+-"Left_Shoulder_Pitch": -1.2,   # 根据限位 -3.29~1.18，负值通常是向前抬起
+-"Right_Shoulder_Pitch": -1.2,
+-"Left_Elbow_Pitch": 0.5,      # 肘部微弯
+-"Right_Elbow_Pitch": 0.5,
++    # --- 手臂：强制向胸口内收并撑地 ---
++    "Left_Shoulder_Pitch": 0.8,    # 向前摆动
++    "Right_Shoulder_Pitch": 0.8,
++    "Left_Shoulder_Roll": 1.3,      # 关键：根据URDF轴向，1.3弧度能将胳膊从侧向转为指向地面
++    "Right_Shoulder_Roll": -1.3,    # 关键：对称内收
++    "Left_Elbow_Pitch": 1.8,        # 肘部大幅弯曲，形成支撑
++    "Right_Elbow_Pitch": 1.8,
++    "Left_Elbow_Yaw": 0.0,
++    "Right_Elbow_Yaw": 0.0,
+     
+-# 腿部：深度弯曲呈爬行状
+-"Left_Hip_Pitch": -1.2,
+-"Right_Hip_Pitch": -1.2,
+-"Left_Knee_Pitch": 1.8,       # 膝盖大幅弯曲（接近限位 2.18）
+-"Right_Knee_Pitch": 1.8,
+-"Left_Ankle_Pitch": -0.5,
+-"Right_Ankle_Pitch": -0.5,
++    # --- 腿部：深度深蹲跪姿 ---
++    "Left_Hip_Pitch": -1.2,         # 大腿向前收
++    "Right_Hip_Pitch": -1.2,
++    "Left_Hip_Roll": 0.0,           # 保持腿部平行
++    "Right_Hip_Roll": 0.0,
++    "Left_Knee_Pitch": 2.1,         # 膝盖近乎折叠 (限位2.18)
++    "Right_Knee_Pitch": 2.1,
++    "Left_Ankle_Pitch": -0.5,
++    "Right_Ankle_Pitch": -0.5,
+     
+-# 躯干：保持直线
+-"Waist": 0.0,
++    "Waist": 0.0,
++    "AAHead_yaw": 0.0,
++    "Head_pitch": 0.4,              # 稍微抬头，防止相机/传感器直接撞地
+ }
+ 
++
++
+ # 必须完全匹配 URDF 中的 link name
+ EXTREMITIES_NAME = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
+ 
+@@ -87,32 +96,28 @@ class ActionsCfg:
+ 
+ @configclass
+ class ObservationsCfg:
+-    """Observation specifications for the MDP."""
+-
+     @configclass
+     class PolicyCfg(ObsGroup):
+-        """Observations for policy group."""
+-        # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
+-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
+-        projected_gravity = ObsTerm(
+-            func=mdp.projected_gravity,
+-            noise=Unoise(n_min=-0.05, n_max=0.05),
+-        )
++        # 替换为爬行专用的坐标映射函数
++        base_lin_vel = ObsTerm(func=base_lin_vel_crawling) 
++        base_ang_vel = ObsTerm(func=base_ang_vel_crawling)
++        projected_gravity = ObsTerm(func=projected_gravity_crawling)
++        
+         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
+         actions = ObsTerm(func=mdp.last_action)
++        
+         def __post_init__(self):
+             self.enable_corruption = True
+             self.concatenate_terms = True
+ 
+     @configclass
+     class CriticCfg(ObsGroup):
+-        """Observations for critic group."""
+-        # observation terms (order preserved)
+-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+-        projected_gravity = ObsTerm(func=mdp.projected_gravity)
++        # Critic 也需要同步修改
++        base_lin_vel = ObsTerm(func=base_lin_vel_crawling)
++        base_ang_vel = ObsTerm(func=base_ang_vel_crawling)
++        projected_gravity = ObsTerm(func=projected_gravity_crawling)
+         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+@@ -225,30 +230,30 @@ class TerminationsCfg:
+     time_out = DoneTerm(func=mdp.time_out, time_out=True)
+ 
+     # 1. 接触检查（这个 mdp.illegal_contact 在 locomotion.mdp 里有，可以保留）
+-    base_contact = DoneTerm(
+-        func=mdp.illegal_contact,
+-        params={
+-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["H1", "H2"]), 
+-            "threshold": 1.0
+-        },
+-    )
++    # base_contact = DoneTerm(
++    #     func=mdp.illegal_contact,
++    #     params={
++    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["H1", "H2"]), 
++    #         "threshold": 1.0
++    #     },
++    # )
+ 
+     # 2. 翻转检查
+     # 修改：直接使用本地函数 bad_orientation，去掉 mdp. 前缀
+-    bad_orientation = DoneTerm(
+-        func=bad_orientation, 
+-        params={
+-            "limit_angle": 1.0,
+-            "asset_cfg": SceneEntityCfg("robot")
+-        },
+-    )
++    # bad_orientation = DoneTerm(
++    #     func=bad_orientation, 
++    #     params={
++    #         "limit_angle": 1.0,
++    #         "asset_cfg": SceneEntityCfg("robot")
++    #     },
++    # )
+ 
+     # 3. 高度检查
+     # 修改：直接使用本地函数 root_height_below，去掉 mdp. 前缀
+-    root_height_below = DoneTerm(
+-        func=root_height_below,
+-        params={"threshold": 0.08, "asset_cfg": SceneEntityCfg("robot")},
+-    )
++    # root_height_below = DoneTerm(
++    #     func=root_height_below,
++    #     params={"threshold": 0.08, "asset_cfg": SceneEntityCfg("robot")},
++    # )
+ 
+ 
+ 
+@@ -323,9 +328,10 @@ class T1Rewards:
+     
+ 
+     # 动态关节偏离惩罚：智能切换站立/爬行参考点
++    # 这会强制机器人保持 CRAWLING_POSE 里的收拢姿态
+     joint_deviation_dynamic = RewTerm(
+         func=crawling_gated_joint_deviation,
+-        weight=-0.5, # 统一给一个中等权重
++        weight=-2.0, 
+         params={
+             "asset_cfg": SceneEntityCfg("robot"),
+             "crawling_pose_dict": CRAWLING_POSE,
+@@ -349,6 +355,27 @@ class T1Rewards:
+         },
+     )
+ 
++    # 2. 增加手臂外展惩罚 (防止 T-pose)
++    arm_flaring_penalty = RewTerm(
++        func=mdp.joint_deviation_l1,
++        weight=-1.0,
++        params={
++            "asset_cfg": SceneEntityCfg(
++                "robot",
++                joint_names=[".*_Shoulder_Roll"],
++            )
++        },
++    )
++
++    # 3. 增加手部高度惩罚 (强制手部贴近地面)
++    hands_at_ground = RewTerm(
++        func=crawling_hands_height_penalty,
++        weight=-5.0, # 给一个明显的权重
++        params={
++            "asset_cfg": SceneEntityCfg("robot", body_names=[".*_hand_link"])
++        },
++    )
++
+ 
+ 
+     
+@@ -395,7 +422,7 @@ class T1Rewards:
+     # - 右手(0.5) 和 左脚(0.5) 同步迈步 (对角线步态)
+     gait_phase = RewTerm(
+         func=feet_gait,
+-        weight=0.5,
++        weight=1.0,
+         params={
+             "period": 0.8, # 爬行周期稍长，增加稳定性
+             "offset": [0.0, 0.5, 0.5, 0.0], 
+@@ -440,47 +467,57 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+ 
+     def __post_init__(self):
+         super().__post_init__()
+-        # Scene
++        
++        # 1. 核心旋转：绕 Y 轴旋转 -90 度 (Pitch = -1.57)
++        # 这样能把垂直的 Trunk (+Z向上) 翻转为水平且胸部朝下 (+X指向地面)
++        # 四元数格式为 (w, x, y, z)
++        crawling_quat = (0.7071, 0.0, -0.7071, 0.0) 
++
++        # 2. 修改初始状态 (Initial State)
+         self.scene.robot = BOOSTER_T1_CFG.replace(
+-            prim_path="{ENV_REGEX_NS}/Robot"
++            prim_path="{ENV_REGEX_NS}/Robot",
++            init_state=ArticulationCfg.InitialStateCfg(
++                pos=(0.0, 0.0, 0.22),      # 稍微抬高，给四肢留出伸展空间防止穿模
++                rot=crawling_quat,         # 脸朝下旋转
++                joint_pos=CRAWLING_POSE,   # 使用你定义的深蹲/撑地姿态
++                joint_vel={".*": 0.0},
++            )
+         )
++
+         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Waist"
+         
+-        # 禁用干扰事件
+-        self.events.push_robot = None
+-        self.events.add_base_mass = None
+-        self.events.base_com = None
+-
+-        # 初始关节随机化：保持 1.0 (站立)，给策略自主权
+-        self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
+-
++        # 3. 彻底重写 Reset Base 事件
++        # 必须在这里强制限制 pitch 为 -1.57，否则 Isaac Lab 默认会把机器人重置为 0 (站立)
+         self.events.reset_base.params = {
+             "pose_range": {
+-                "x": (-0.3, 0.3),
+-                "y": (-0.3, 0.3),
++                "x": (-0.2, 0.2),
++                "y": (-0.2, 0.2),
+                 "yaw": (-3.14, 3.14),
++                "pitch": (-1.57, -1.57),  # 强制锁定为脸朝下趴着
++                "roll": (0.0, 0.0),
+             },
+             "velocity_range": {
+-                "x": (0.0, 0.0),
+-                "y": (0.0, 0.0),
+-                "z": (0.0, 0.0),
+-                "roll": (0.0, 0.0),
+-                "pitch": (0.0, 0.0),
+-                "yaw": (0.0, 0.0),
++                "x": (0.0, 0.0), "y": (0.0, 0.0), "z": (0.0, 0.0),
++                "roll": (0.0, 0.0), "pitch": (0.0, 0.0), "yaw": (0.0, 0.0)
+             },
+         }
+ 
+-        # 基础命令范围
+-        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0) # 对应爬行前行
+-        self.commands.base_velocity.ranges.lin_vel_y = (-0.2, 0.2)
+-        self.commands.base_velocity.ranges.ang_vel_z = (-0.6, 0.6)
++        # 4. 确保关节重置也完全匹配 CRAWLING_POSE
++        # position_range 为 (1.0, 1.0) 意味着 100% 采用 init_state 中的 joint_pos
++        self.events.reset_robot_joints.params = {
++            "position_range": (1.0, 1.0),
++            "velocity_range": (0.0, 0.0),
++        }
+ 
+-        # --- 重要：修正终止条件中的覆盖 ---
+-        # 移除原有的 self.terminations.base_contact.params 覆盖，使用我们类里定义的 [Trunk, H1, H2]
+-        # 这样可以保护头部不撞击地面
+         
+-        # 将原本的 fallen 逻辑阈值下调，适应爬行高度
+-        self.terminations.root_height_below.params["threshold"] = 0.08
++        # 禁用可能干扰初始姿态的随机化事件
++        self.events.push_robot = None
++        self.events.add_base_mass = None
++        self.events.base_com = None
++
++        self.commands.base_velocity.ranges.lin_vel_x = (0.2, 0.6) # 先练慢速前行
++        self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
++        self.commands.base_velocity.ranges.ang_vel_z = (-0.3, 0.3)
+ 
+ 
+ @configclass
+diff --git a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/mdp/rewards.py b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/mdp/rewards.py
+index 9ff87b2..a61e9bd 100644
+--- a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/mdp/rewards.py
++++ b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/mdp/rewards.py
+@@ -284,6 +284,31 @@ def leg_joint_vel_symmetry_l2(
+ 
+ ################################## 特定于 Booster T1 Rough Claw 任务的奖励项 #####################################
+ 
++def base_lin_vel_crawling(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
++    """ 
++    核心修正：重排线速度观察。
++    原本的 [v_x, v_y, v_z] 对应 [肚皮, 侧向, 躯干]。
++    我们要给策略返回 [躯干(Z), 侧向(Y), -肚皮(X)]，让它把躯干方向当成前进方向。
++    """
++    asset = env.scene[asset_cfg.name]
++    vel_b = asset.data.root_lin_vel_b
++    # index 2 是 Z (前进), index 1 是 Y (侧移), index 0 是 X (垂直)
++    return torch.stack([vel_b[:, 2], vel_b[:, 1], -vel_b[:, 0]], dim=1)
++
++def base_ang_vel_crawling(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
++    """ 重排角速度：让策略看到的 [w_roll, w_pitch, w_yaw] 对应爬行态 """
++    asset = env.scene[asset_cfg.name]
++    ang_vel_b = asset.data.root_ang_vel_b
++    # 爬行时的转向(Yaw)实际上是绕局部 X 轴（垂直地面）的旋转
++    return torch.stack([ang_vel_b[:, 2], ang_vel_b[:, 1], -ang_vel_b[:, 0]], dim=1)
++
++def projected_gravity_crawling(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
++    """ 重排重力投影观察 """
++    asset = env.scene[asset_cfg.name]
++    gravity_b = _get_projected_gravity(env, asset)
++    # 正常趴着时，重力应该在局部 X 轴上。我们重排它，让策略看到它在熟悉的 Z 轴位置上
++    return torch.stack([gravity_b[:, 2], gravity_b[:, 1], gravity_b[:, 0]], dim=1)
++
+ def _get_projected_gravity(env, asset):
+     """助手函数：手动计算重力投影"""
+     gravity_vec = torch.tensor([0.0, 0.0, -1.0], device=env.device).repeat(env.num_envs, 1)
+@@ -295,11 +320,18 @@ def track_lin_vel_yz_body_exp(
+     command_name: str, 
+     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+ ) -> torch.Tensor:
+-    command = env.command_manager.get_command(command_name)[:, :2]
++    """ 
++    奖励函数：强制让 Command X 对应 Body Z。
++    """
++    command = env.command_manager.get_command(command_name) # [cmd_x, cmd_y, cmd_yaw]
+     asset = env.scene[asset_cfg.name]
+     vel_b = asset.data.root_lin_vel_b
+-    actual_vel_yz = vel_b[:, [2, 1]]
+-    error = torch.sum(torch.square(command - actual_vel_yz), dim=1)
++    
++    # 提取机器人当前的 前进速度(Body Z) 和 侧向速度(Body Y)
++    actual_vel = torch.stack([vel_b[:, 2], vel_b[:, 1]], dim=1)
++    
++    # 计算期望速度(command_x, command_y)与实际速度的误差
++    error = torch.sum(torch.square(command[:, :2] - actual_vel), dim=1)
+     return torch.exp(-error / (std**2))
+ 
+ def track_ang_vel_x_body_exp(
+@@ -308,20 +340,29 @@ def track_ang_vel_x_body_exp(
+     command_name: str, 
+     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+ ) -> torch.Tensor:
+-    command_wz = env.command_manager.get_command(command_name)[:, 2]
++    """ 
++    转向奖励：Command Yaw 对应 Body X 的旋转。
++    """
++    command = env.command_manager.get_command(command_name)
+     asset = env.scene[asset_cfg.name]
+     ang_vel_b = asset.data.root_ang_vel_b
++    
++    # 绕物理垂直轴转弯 = 绕机器人局部 X 轴
+     actual_yaw_vel = -ang_vel_b[:, 0]
+-    error = torch.square(command_wz - actual_yaw_vel)
++    
++    error = torch.square(command[:, 2] - actual_yaw_vel)
+     return torch.exp(-error / (std**2))
+ 
+ def crawling_orientation_l2(
+     env: "ManagerBasedRLEnv", 
+     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+ ) -> torch.Tensor:
++    """ 姿态惩罚：确保重力投影在 X 轴上，而 Y, Z 分量为 0 """
+     asset = env.scene[asset_cfg.name]
+-    # 手动计算
+     projected_gravity = _get_projected_gravity(env, asset)
++    
++    # 如果 projected_gravity 是 [1.0, 0, 0]，说明胸口完全水平朝下
++    # 我们惩罚 Y 和 Z 分量的不为零
+     return torch.sum(torch.square(projected_gravity[:, [1, 2]]), dim=1)
+ 
+ def crawling_gated_ang_vel_yz_l2(
+@@ -369,4 +410,19 @@ def crawling_gated_joint_deviation(
+     gate = torch.clamp(projected_gravity[:, 0], min=0.0, max=1.0).unsqueeze(1)
+ 
+     dynamic_target = (1.0 - gate) * default_stand_pos + gate * crawling_target
+-    return torch.sum(torch.abs(curr_joint_pos - dynamic_target), dim=1)
+\ No newline at end of file
++    return torch.sum(torch.abs(curr_joint_pos - dynamic_target), dim=1)
++
++
++def crawling_hands_height_penalty(
++    env: "ManagerBasedRLEnv", 
++    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=[".*_hand_link"])
++) -> torch.Tensor:
++    """ 惩罚手部高于地面。在俯卧姿态下，Root X轴指向地面，
++        手部相对于Root的局部位移如果太大，说明手没撑地。
++        更简单的做法：直接检查手部的世界坐标 Z 轴。
++    """
++    asset = env.scene[asset_cfg.name]
++    # 获取手部的世界坐标高度
++    hand_pos_z = asset.data.body_pos_w[:, asset_cfg.body_ids, 2] 
++    # 惩罚高度超过 0.1m 的部分
++    return torch.sum(torch.square(torch.clamp(hand_pos_z - 0.1, min=0.0)), dim=1)
+\ No newline at end of file

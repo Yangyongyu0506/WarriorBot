@@ -1,0 +1,133 @@
+--- git status ---
+On branch HenryHe
+Your branch is up to date with 'origin/HenryHe'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-02-41/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-14-38/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-20-09/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-40-01/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-42-26/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-44-03/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-45-05/
+	outputs/2026-01-31/
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+index 7d5fde4..480700f 100644
+--- a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
++++ b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+@@ -54,8 +54,12 @@ CRAWLING_POSE = {
+     
+ # 躯干：保持直线
+ "Waist": 0.0,
++"AAHead_yaw": 0.0,
++"Head_pitch": 0.0,
+ }
+ 
++
++
+ # 必须完全匹配 URDF 中的 link name
+ EXTREMITIES_NAME = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
+ 
+@@ -235,13 +239,13 @@ class TerminationsCfg:
+ 
+     # 2. 翻转检查
+     # 修改：直接使用本地函数 bad_orientation，去掉 mdp. 前缀
+-    bad_orientation = DoneTerm(
+-        func=bad_orientation, 
+-        params={
+-            "limit_angle": 1.0,
+-            "asset_cfg": SceneEntityCfg("robot")
+-        },
+-    )
++    # bad_orientation = DoneTerm(
++    #     func=bad_orientation, 
++    #     params={
++    #         "limit_angle": 1.0,
++    #         "asset_cfg": SceneEntityCfg("robot")
++    #     },
++    # )
+ 
+     # 3. 高度检查
+     # 修改：直接使用本地函数 root_height_below，去掉 mdp. 前缀
+@@ -440,10 +444,23 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+ 
+     def __post_init__(self):
+         super().__post_init__()
+-        # Scene
++        
++        # 定义绕 Y 轴旋转 90 度的四元数 (W, X, Y, Z)
++        # 这样可以将原本垂直的躯干（Z轴向上）翻转为水平（Z轴指向前方，X轴指向地面）
++        # 让机器人呈现“胸部贴地”的爬行姿态
++        pitch_90_deg = (0.7071, 0.0, 0.7071, 0.0) 
++
++        # 核心修改：设置初始状态
+         self.scene.robot = BOOSTER_T1_CFG.replace(
+-            prim_path="{ENV_REGEX_NS}/Robot"
++            prim_path="{ENV_REGEX_NS}/Robot",
++            init_state=ArticulationCfg.InitialStateCfg(
++                pos=(0.0, 0.0, 0.15),      # 趴下后重心很低，0.15m 左右即可
++                rot=pitch_90_deg,          # 关键：应用 90 度旋转，让 Trunk 趴下
++                joint_pos=CRAWLING_POSE,   # 应用你定义的深蹲/撑地关节角度
++                joint_vel={".*": 0.0},
++            )
+         )
++
+         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Waist"
+         
+         # 禁用干扰事件
+@@ -451,36 +468,21 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+         self.events.add_base_mass = None
+         self.events.base_com = None
+ 
+-        # 初始关节随机化：保持 1.0 (站立)，给策略自主权
+-        self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
+-
++        # 确保每次 Reset 时，都强制回到上面定义的 init_state (位置和旋转)
+         self.events.reset_base.params = {
+             "pose_range": {
+-                "x": (-0.3, 0.3),
+-                "y": (-0.3, 0.3),
++                "x": (-0.2, 0.2),
++                "y": (-0.2, 0.2),
+                 "yaw": (-3.14, 3.14),
+             },
+-            "velocity_range": {
+-                "x": (0.0, 0.0),
+-                "y": (0.0, 0.0),
+-                "z": (0.0, 0.0),
+-                "roll": (0.0, 0.0),
+-                "pitch": (0.0, 0.0),
+-                "yaw": (0.0, 0.0),
+-            },
++            "velocity_range": {"x": (0, 0), "y": (0, 0), "z": (0, 0), "roll": (0, 0), "pitch": (0, 0), "yaw": (0, 0)},
+         }
+ 
+-        # 基础命令范围
+-        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0) # 对应爬行前行
+-        self.commands.base_velocity.ranges.lin_vel_y = (-0.2, 0.2)
+-        self.commands.base_velocity.ranges.ang_vel_z = (-0.6, 0.6)
++        # 确保关节也回到 init_state 里的 CRAWLING_POSE
++        self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
+ 
+-        # --- 重要：修正终止条件中的覆盖 ---
+-        # 移除原有的 self.terminations.base_contact.params 覆盖，使用我们类里定义的 [Trunk, H1, H2]
+-        # 这样可以保护头部不撞击地面
+-        
+-        # 将原本的 fallen 逻辑阈值下调，适应爬行高度
+-        self.terminations.root_height_below.params["threshold"] = 0.08
++        # 调整高度终止阈值：趴着爬行时 Root Z 很低，设为 0.05m（5厘米）防止误触发
++        self.terminations.root_height_below.params["threshold"] = 0.05
+ 
+ 
+ @configclass

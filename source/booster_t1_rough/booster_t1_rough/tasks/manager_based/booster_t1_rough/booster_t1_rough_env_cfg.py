@@ -38,46 +38,36 @@ from .mdp.terminations import *
 
 #### 定义爬行时的理想参考姿态（让四肢像四足动物一样分布）
 CRAWLING_POSE = {
-# 手臂：向前伸出撑地
-"Left_Shoulder_Pitch": -1.2,   # 根据限位 -3.29~1.18，负值通常是向前抬起
-"Right_Shoulder_Pitch": -1.2,
-"Left_Elbow_Pitch": 0.5,      # 肘部微弯
-"Right_Elbow_Pitch": 0.5,
+    # --- 手臂：强制向胸口内收并撑地 ---
+    "Left_Shoulder_Pitch": 0.8,    # 向前摆动
+    "Right_Shoulder_Pitch": 0.8,
+    "Left_Shoulder_Roll": 1.3,      # 关键：根据URDF轴向，1.3弧度能将胳膊从侧向转为指向地面
+    "Right_Shoulder_Roll": -1.3,    # 关键：对称内收
+    "Left_Elbow_Pitch": 1.8,        # 肘部大幅弯曲，形成支撑
+    "Right_Elbow_Pitch": 1.8,
+    "Left_Elbow_Yaw": 0.0,
+    "Right_Elbow_Yaw": 0.0,
     
-# 腿部：深度弯曲呈爬行状
-"Left_Hip_Pitch": -1.2,
-"Right_Hip_Pitch": -1.2,
-"Left_Knee_Pitch": 1.8,       # 膝盖大幅弯曲（接近限位 2.18）
-"Right_Knee_Pitch": 1.8,
-"Left_Ankle_Pitch": -0.5,
-"Right_Ankle_Pitch": -0.5,
+    # --- 腿部：深度深蹲跪姿 ---
+    "Left_Hip_Pitch": -1.2,         # 大腿向前收
+    "Right_Hip_Pitch": -1.2,
+    "Left_Hip_Roll": 0.0,           # 保持腿部平行
+    "Right_Hip_Roll": 0.0,
+    "Left_Knee_Pitch": 2.1,         # 膝盖近乎折叠 (限位2.18)
+    "Right_Knee_Pitch": 2.1,
+    "Left_Ankle_Pitch": -0.5,
+    "Right_Ankle_Pitch": -0.5,
     
-# 躯干：保持直线
-"Waist": 0.0,
+    "Waist": 0.0,
+    "AAHead_yaw": 0.0,
+    "Head_pitch": 0.4,              # 稍微抬头，防止相机/传感器直接撞地
 }
+
+
 
 # 必须完全匹配 URDF 中的 link name
 EXTREMITIES_NAME = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
 
-
-
-
-@configclass
-class CommandsCfg:
-    """Command specifications for the MDP."""
-
-    base_velocity = mdp.UniformVelocityCommandCfg(
-        asset_name="robot",
-        resampling_time_range=(10.0, 10.0),
-        rel_standing_envs=0.02,
-        rel_heading_envs=1.0,
-        heading_command=True,
-        heading_control_stiffness=0.5,
-        debug_vis=True,
-        ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
-        ),
-    )
 
 @configclass
 class ActionsCfg:
@@ -85,34 +75,53 @@ class ActionsCfg:
 
     joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.7, use_default_offset=True)
 
+
+@configclass
+class CommandsCfg:
+    base_velocity = mdp.UniformVelocityCommandCfg(
+        asset_name="robot",
+        resampling_time_range=(10.0, 10.0),
+        rel_standing_envs=0.02,
+        rel_heading_envs=1.0,
+        heading_command=False, # 设为 False，因为 heading 逻辑默认绑定在 X 轴，会干扰 Z 轴爬行
+        heading_control_stiffness=0.5,
+        debug_vis=True,
+        ranges=mdp.UniformVelocityCommandCfg.Ranges(
+            # 我们在这里使用 lin_vel_x 这个插槽来代表“躯干方向的前进速度”
+            lin_vel_x=(0.3, 0.8),    # 这里的 x 逻辑上对应躯干方向 (Body Z)
+            lin_vel_y=(-0.2, 0.2),   # 侧移
+            ang_vel_z=(-0.5, 0.5)    # 转向
+        ),
+    )
+
 @configclass
 class ObservationsCfg:
-    """Observation specifications for the MDP."""
-
     @configclass
     class PolicyCfg(ObsGroup):
-        """Observations for policy group."""
-        # base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
-        projected_gravity = ObsTerm(
-            func=mdp.projected_gravity,
-            noise=Unoise(n_min=-0.05, n_max=0.05),
-        )
+        # 1. 告诉策略：你看到的第一个线速度分量是 Body Z
+        base_lin_vel = ObsTerm(func=base_lin_vel_crawling) 
+        base_ang_vel = ObsTerm(func=base_ang_vel_crawling)
+        projected_gravity = ObsTerm(func=projected_gravity_crawling)
+        
+        # 2. 这里不需要专门的 crawling_velocity_commands 了，
+        # 因为我们已经在上面的 base_lin_vel 中把 Z 挪到了第一个位置，
+        # 刚好对应 Commands 中的 lin_vel_x (Index 0)
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+        
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
         actions = ObsTerm(func=mdp.last_action)
+        
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
 
     @configclass
     class CriticCfg(ObsGroup):
-        """Observations for critic group."""
-        # observation terms (order preserved)
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
-        projected_gravity = ObsTerm(func=mdp.projected_gravity)
+        # Critic 也需要同步修改
+        base_lin_vel = ObsTerm(func=base_lin_vel_crawling)
+        base_ang_vel = ObsTerm(func=base_ang_vel_crawling)
+        projected_gravity = ObsTerm(func=projected_gravity_crawling)
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
@@ -225,30 +234,30 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
     # 1. 接触检查（这个 mdp.illegal_contact 在 locomotion.mdp 里有，可以保留）
-    base_contact = DoneTerm(
-        func=mdp.illegal_contact,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["H1", "H2"]), 
-            "threshold": 1.0
-        },
-    )
+    # base_contact = DoneTerm(
+    #     func=mdp.illegal_contact,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["H1", "H2"]), 
+    #         "threshold": 1.0
+    #     },
+    # )
 
     # 2. 翻转检查
     # 修改：直接使用本地函数 bad_orientation，去掉 mdp. 前缀
-    bad_orientation = DoneTerm(
-        func=bad_orientation, 
-        params={
-            "limit_angle": 1.0,
-            "asset_cfg": SceneEntityCfg("robot")
-        },
-    )
+    # bad_orientation = DoneTerm(
+    #     func=bad_orientation, 
+    #     params={
+    #         "limit_angle": 1.0,
+    #         "asset_cfg": SceneEntityCfg("robot")
+    #     },
+    # )
 
     # 3. 高度检查
     # 修改：直接使用本地函数 root_height_below，去掉 mdp. 前缀
-    root_height_below = DoneTerm(
-        func=root_height_below,
-        params={"threshold": 0.08, "asset_cfg": SceneEntityCfg("robot")},
-    )
+    # root_height_below = DoneTerm(
+    #     func=root_height_below,
+    #     params={"threshold": 0.08, "asset_cfg": SceneEntityCfg("robot")},
+    # )
 
 
 
@@ -323,9 +332,10 @@ class T1Rewards:
     
 
     # 动态关节偏离惩罚：智能切换站立/爬行参考点
+    # 这会强制机器人保持 CRAWLING_POSE 里的收拢姿态
     joint_deviation_dynamic = RewTerm(
         func=crawling_gated_joint_deviation,
-        weight=-0.5, # 统一给一个中等权重
+        weight=-2.0, 
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             "crawling_pose_dict": CRAWLING_POSE,
@@ -346,6 +356,27 @@ class T1Rewards:
                     "Head_pitch",
                 ],
             )
+        },
+    )
+
+    # 2. 增加手臂外展惩罚 (防止 T-pose)
+    arm_flaring_penalty = RewTerm(
+        func=mdp.joint_deviation_l1,
+        weight=-1.0,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[".*_Shoulder_Roll"],
+            )
+        },
+    )
+
+    # 3. 增加手部高度惩罚 (强制手部贴近地面)
+    hands_at_ground = RewTerm(
+        func=crawling_hands_height_penalty,
+        weight=-5.0, # 给一个明显的权重
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=[".*_hand_link"])
         },
     )
 
@@ -395,7 +426,7 @@ class T1Rewards:
     # - 右手(0.5) 和 左脚(0.5) 同步迈步 (对角线步态)
     gait_phase = RewTerm(
         func=feet_gait,
-        weight=0.5,
+        weight=1.0,
         params={
             "period": 0.8, # 爬行周期稍长，增加稳定性
             "offset": [0.0, 0.5, 0.5, 0.0], 
@@ -440,48 +471,34 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
-        # Scene
+    
+        # 核心修正：绕 Y 轴旋转 +90 度 (四元数: w=0.7071, y=0.7071)
+        # 这样机器人的局部 X 轴就变成了指向头部的方向，局部 Z 轴变成了指向背部的方向
+        crawling_quat = (0.7071, 0.0, 0.7071, 0.0) 
         self.scene.robot = BOOSTER_T1_CFG.replace(
-            prim_path="{ENV_REGEX_NS}/Robot"
+            prim_path="{ENV_REGEX_NS}/Robot",
+            init_state=ArticulationCfg.InitialStateCfg(
+                pos=(0.0, 0.0, 0.25),      # 趴下后的高度
+                rot=crawling_quat,         # 让 X 轴指向头顶
+                joint_pos=CRAWLING_POSE,
+                joint_vel={".*": 0.0},
+            )
         )
-        self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Waist"
-        
-        # 禁用干扰事件
-        self.events.push_robot = None
-        self.events.add_base_mass = None
-        self.events.base_com = None
 
-        # 初始关节随机化：保持 1.0 (站立)，给策略自主权
-        self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
-
+        # 修正 Reset 事件：强制锁定 Pitch 为 1.57 (90度)
         self.events.reset_base.params = {
             "pose_range": {
-                "x": (-0.3, 0.3),
-                "y": (-0.3, 0.3),
-                "yaw": (-3.14, 3.14),
-            },
-            "velocity_range": {
-                "x": (0.0, 0.0),
-                "y": (0.0, 0.0),
-                "z": (0.0, 0.0),
+                "x": (-0.2, 0.2), "y": (-0.2, 0.2), "yaw": (-3.14, 3.14),
+                "pitch": (1.57, 1.57),  # 对应 90 度
                 "roll": (0.0, 0.0),
-                "pitch": (0.0, 0.0),
-                "yaw": (0.0, 0.0),
             },
+            "velocity_range": {"x": (0,0), "y": (0,0), "z": (0,0), "roll": (0,0), "pitch": (0,0), "yaw": (0,0)},
         }
 
-        # 基础命令范围
-        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0) # 对应爬行前行
-        self.commands.base_velocity.ranges.lin_vel_y = (-0.2, 0.2)
-        self.commands.base_velocity.ranges.ang_vel_z = (-0.6, 0.6)
-
-        # --- 重要：修正终止条件中的覆盖 ---
-        # 移除原有的 self.terminations.base_contact.params 覆盖，使用我们类里定义的 [Trunk, H1, H2]
-        # 这样可以保护头部不撞击地面
-        
-        # 将原本的 fallen 逻辑阈值下调，适应爬行高度
-        self.terminations.root_height_below.params["threshold"] = 0.08
-
+        # 因为 X 轴已经是头了，我们直接使用系统标准观察项，不需要自定义映射了！
+        self.observations.policy.base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        self.observations.policy.base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        self.observations.policy.projected_gravity = ObsTerm(func=mdp.projected_gravity)
 
 @configclass
 class BoosterT1RoughEnvCfg_PLAY(BoosterT1RoughEnvCfg):

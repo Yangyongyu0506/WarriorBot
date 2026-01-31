@@ -1,0 +1,124 @@
+--- git status ---
+On branch HenryHe
+Your branch is up to date with 'origin/HenryHe'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-02-41/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-14-38/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-20-09/
+	logs/rsl_rl/cartpole_direct/2026-01-31_14-40-01/
+	outputs/2026-01-31/
+
+no changes added to commit (use "git add" and/or "git commit -a") 
+
+
+--- git diff ---
+diff --git a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+index 7d5fde4..a6c22bc 100644
+--- a/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
++++ b/source/booster_t1_rough/booster_t1_rough/tasks/manager_based/booster_t1_rough/booster_t1_rough_env_cfg.py
+@@ -54,8 +54,12 @@ CRAWLING_POSE = {
+     
+ # 躯干：保持直线
+ "Waist": 0.0,
++"AAHead_yaw": 0.0,
++"Head_pitch": 0.0,
+ }
+ 
++
++
+ # 必须完全匹配 URDF 中的 link name
+ EXTREMITIES_NAME = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
+ 
+@@ -235,13 +239,13 @@ class TerminationsCfg:
+ 
+     # 2. 翻转检查
+     # 修改：直接使用本地函数 bad_orientation，去掉 mdp. 前缀
+-    bad_orientation = DoneTerm(
+-        func=bad_orientation, 
+-        params={
+-            "limit_angle": 1.0,
+-            "asset_cfg": SceneEntityCfg("robot")
+-        },
+-    )
++    # bad_orientation = DoneTerm(
++    #     func=bad_orientation, 
++    #     params={
++    #         "limit_angle": 1.0,
++    #         "asset_cfg": SceneEntityCfg("robot")
++    #     },
++    # )
+ 
+     # 3. 高度检查
+     # 修改：直接使用本地函数 root_height_below，去掉 mdp. 前缀
+@@ -440,47 +444,33 @@ class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
+ 
+     def __post_init__(self):
+         super().__post_init__()
+-        # Scene
++        
++        # 修正参数名为 init_state
+         self.scene.robot = BOOSTER_T1_CFG.replace(
+-            prim_path="{ENV_REGEX_NS}/Robot"
++            prim_path="{ENV_REGEX_NS}/Robot",
++            # 注意这里：是 init_state 而不是 initial_state
++            init_state=ArticulationCfg.InitialStateCfg(
++                pos=(0.0, 0.0, 0.25),      # 初始离地高度
++                rot=(1.0, 0.0, 0.0, 0.0), # 保持水平 (W, X, Y, Z)
++                joint_pos=CRAWLING_POSE,  # 使用你定义的爬行姿态字典
++                joint_vel={".*": 0.0},    # 所有关节初始速度为0
++            )
+         )
++
+         self.scene.height_scanner.prim_path = "{ENV_REGEX_NS}/Robot/Waist"
+         
+-        # 禁用干扰事件
++        # 禁用干扰事件（可选，建议初期关闭）
+         self.events.push_robot = None
+         self.events.add_base_mass = None
+         self.events.base_com = None
+ 
+-        # 初始关节随机化：保持 1.0 (站立)，给策略自主权
++        # 确保重置时使用我们在上面定义好的 init_state 里的 joint_pos
++        # position_range 为 (1.0, 1.0) 表示 100% 采用 init_state 定义的值
+         self.events.reset_robot_joints.params["position_range"] = (1.0, 1.0)
++        self.events.reset_robot_joints.params["velocity_range"] = (0.0, 0.0)
+ 
+-        self.events.reset_base.params = {
+-            "pose_range": {
+-                "x": (-0.3, 0.3),
+-                "y": (-0.3, 0.3),
+-                "yaw": (-3.14, 3.14),
+-            },
+-            "velocity_range": {
+-                "x": (0.0, 0.0),
+-                "y": (0.0, 0.0),
+-                "z": (0.0, 0.0),
+-                "roll": (0.0, 0.0),
+-                "pitch": (0.0, 0.0),
+-                "yaw": (0.0, 0.0),
+-            },
+-        }
+-
+-        # 基础命令范围
+-        self.commands.base_velocity.ranges.lin_vel_x = (-1.0, 1.0) # 对应爬行前行
+-        self.commands.base_velocity.ranges.lin_vel_y = (-0.2, 0.2)
+-        self.commands.base_velocity.ranges.ang_vel_z = (-0.6, 0.6)
+-
+-        # --- 重要：修正终止条件中的覆盖 ---
+-        # 移除原有的 self.terminations.base_contact.params 覆盖，使用我们类里定义的 [Trunk, H1, H2]
+-        # 这样可以保护头部不撞击地面
+-        
+-        # 将原本的 fallen 逻辑阈值下调，适应爬行高度
+-        self.terminations.root_height_below.params["threshold"] = 0.08
++        # 调整高度终止阈值，防止爬行时因离地间隙小而频繁触发重置
++        self.terminations.root_height_below.params["threshold"] = 0.06
+ 
+ 
+ @configclass

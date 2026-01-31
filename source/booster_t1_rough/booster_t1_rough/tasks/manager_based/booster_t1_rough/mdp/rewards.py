@@ -284,6 +284,31 @@ def leg_joint_vel_symmetry_l2(
 
 ################################## 特定于 Booster T1 Rough Claw 任务的奖励项 #####################################
 
+def base_lin_vel_crawling(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """ 
+    核心修正：重排线速度观察。
+    原本的 [v_x, v_y, v_z] 对应 [肚皮, 侧向, 躯干]。
+    我们要给策略返回 [躯干(Z), 侧向(Y), -肚皮(X)]，让它把躯干方向当成前进方向。
+    """
+    asset = env.scene[asset_cfg.name]
+    vel_b = asset.data.root_lin_vel_b
+    # index 2 是 Z (前进), index 1 是 Y (侧移), index 0 是 X (垂直)
+    return torch.stack([vel_b[:, 2], vel_b[:, 1], -vel_b[:, 0]], dim=1)
+
+def base_ang_vel_crawling(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """ 重排角速度：让策略看到的 [w_roll, w_pitch, w_yaw] 对应爬行态 """
+    asset = env.scene[asset_cfg.name]
+    ang_vel_b = asset.data.root_ang_vel_b
+    # 爬行时的转向(Yaw)实际上是绕局部 X 轴（垂直地面）的旋转
+    return torch.stack([ang_vel_b[:, 2], ang_vel_b[:, 1], -ang_vel_b[:, 0]], dim=1)
+
+def projected_gravity_crawling(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """ 重排重力投影观察 """
+    asset = env.scene[asset_cfg.name]
+    gravity_b = _get_projected_gravity(env, asset)
+    # 正常趴着时，重力应该在局部 X 轴上。我们重排它，让策略看到它在熟悉的 Z 轴位置上
+    return torch.stack([gravity_b[:, 2], gravity_b[:, 1], gravity_b[:, 0]], dim=1)
+
 def _get_projected_gravity(env, asset):
     """助手函数：手动计算重力投影"""
     gravity_vec = torch.tensor([0.0, 0.0, -1.0], device=env.device).repeat(env.num_envs, 1)
@@ -295,11 +320,24 @@ def track_lin_vel_yz_body_exp(
     command_name: str, 
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
-    command = env.command_manager.get_command(command_name)[:, :2]
+    """ 
+    修正后的映射：
+    Command Manager 会根据机器人姿态将速度分配到 [v_x, v_y, v_z]。
+    在爬行姿态下（Pitch -90），世界坐标的前进对应机器人的 Body Z。
+    """
+    # 获取完整的命令 [v_x, v_y, v_z, w_z]
+    # 注意：mdp.generated_commands 默认可能只返回前3个，我们直接从 manager 获取原始 tensor
+    command = env.command_manager.get_command(command_name) 
     asset = env.scene[asset_cfg.name]
     vel_b = asset.data.root_lin_vel_b
-    actual_vel_yz = vel_b[:, [2, 1]]
-    error = torch.sum(torch.square(command - actual_vel_yz), dim=1)
+    
+    # 核心修正：
+    # 期望的前进速度现在在 command 的第 3 个槽位 (index 2, 即 v_z)
+    # 期望的侧向速度在 command 的第 2 个槽位 (index 1, 即 v_y)
+    target_vel = command[:, [2, 1]] 
+    actual_vel = vel_b[:, [2, 1]]   # 实际的 [Body Z, Body Y]
+    
+    error = torch.sum(torch.square(target_vel - actual_vel), dim=1)
     return torch.exp(-error / (std**2))
 
 def track_ang_vel_x_body_exp(
@@ -308,20 +346,29 @@ def track_ang_vel_x_body_exp(
     command_name: str, 
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
-    command_wz = env.command_manager.get_command(command_name)[:, 2]
+    """ 
+    转向奖励：Command Yaw 对应 Body X 的旋转。
+    """
+    command = env.command_manager.get_command(command_name)
     asset = env.scene[asset_cfg.name]
     ang_vel_b = asset.data.root_ang_vel_b
+    
+    # 绕物理垂直轴转弯 = 绕机器人局部 X 轴
     actual_yaw_vel = -ang_vel_b[:, 0]
-    error = torch.square(command_wz - actual_yaw_vel)
+    
+    error = torch.square(command[:, 2] - actual_yaw_vel)
     return torch.exp(-error / (std**2))
 
 def crawling_orientation_l2(
     env: "ManagerBasedRLEnv", 
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
+    """ 姿态惩罚：确保重力投影在 X 轴上，而 Y, Z 分量为 0 """
     asset = env.scene[asset_cfg.name]
-    # 手动计算
     projected_gravity = _get_projected_gravity(env, asset)
+    
+    # 如果 projected_gravity 是 [1.0, 0, 0]，说明胸口完全水平朝下
+    # 我们惩罚 Y 和 Z 分量的不为零
     return torch.sum(torch.square(projected_gravity[:, [1, 2]]), dim=1)
 
 def crawling_gated_ang_vel_yz_l2(
@@ -370,3 +417,18 @@ def crawling_gated_joint_deviation(
 
     dynamic_target = (1.0 - gate) * default_stand_pos + gate * crawling_target
     return torch.sum(torch.abs(curr_joint_pos - dynamic_target), dim=1)
+
+
+def crawling_hands_height_penalty(
+    env: "ManagerBasedRLEnv", 
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=[".*_hand_link"])
+) -> torch.Tensor:
+    """ 惩罚手部高于地面。在俯卧姿态下，Root X轴指向地面，
+        手部相对于Root的局部位移如果太大，说明手没撑地。
+        更简单的做法：直接检查手部的世界坐标 Z 轴。
+    """
+    asset = env.scene[asset_cfg.name]
+    # 获取手部的世界坐标高度
+    hand_pos_z = asset.data.body_pos_w[:, asset_cfg.body_ids, 2] 
+    # 惩罚高度超过 0.1m 的部分
+    return torch.sum(torch.square(torch.clamp(hand_pos_z - 0.1, min=0.0)), dim=1)
