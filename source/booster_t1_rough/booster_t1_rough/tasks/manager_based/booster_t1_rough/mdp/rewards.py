@@ -272,3 +272,44 @@ def leg_joint_vel_symmetry_l2(
         reward = torch.clamp(reward, max=clip)
 
     return reward
+
+def leg_joint_pos_symmetry_l2(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    clip : float | None = None,
+) -> torch.Tensor:
+    asset: Articulation = env.scene[asset_cfg.name]
+
+    # ---------- cache joint index pairs ----------
+    if not hasattr(env, "_leg_pos_symmetry_cache"):
+        # 1. 用 regex 找到所有目标 joint indices
+        joint_ids, joint_names = asset.find_joints(asset_cfg.joint_names)
+
+        # 2. 按名字分左右腿（假设 L_/R_ 命名）
+        left = {}
+        right = {}
+
+        for jid, name in zip(joint_ids, joint_names):
+            if name.startswith("Left_"):
+                left[name[5:]] = jid
+            elif name.startswith("Right_"):
+                right[name[6:]] = jid
+
+        # 3. 取交集，形成 (L, R) index 对
+        pairs = []
+        for k in left.keys() & right.keys():
+            pairs.append((left[k], right[k]))
+
+        assert len(pairs) > 0, \
+            f"No left-right joint pairs found for {asset_cfg.joint_names}"
+        env._leg_pos_symmetry_cache = pairs
+    pairs = env._leg_pos_symmetry_cache
+    pos = asset.data.joint_pos  # [num_envs, num_joints]
+    reward = torch.zeros(env.num_envs, device=env.device)
+    for l_id, r_id in pairs:
+        diff = pos[:, l_id] + pos[:, r_id]
+        reward += diff * diff
+    reward /= len(pairs)
+    if clip is not None:
+        reward = torch.clamp(reward, max=clip)
+    return reward
