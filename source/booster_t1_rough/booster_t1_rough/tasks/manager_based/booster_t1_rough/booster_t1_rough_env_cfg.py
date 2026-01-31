@@ -291,7 +291,7 @@ class RewardsCfg:
     )
 
     # 关键：直接抑制高速抖动（比 action_rate 更直接）
-    arm_joint_vel_penalty = RewTerm(
+    joint_vel_penalty = RewTerm(
         func=mdp.joint_vel_l2,
         weight=-0.08,
         params={
@@ -302,6 +302,7 @@ class RewardsCfg:
                     "Left_Elbow_.*",
                     "Right_Shoulder_.*",
                     "Right_Elbow_.*",
+                    ".*_Ankle_.*",
                 ],
             )
         },
@@ -312,7 +313,7 @@ class RewardsCfg:
     # =========================================================
     knee_ankle_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-0.08,
+        weight=-1.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
