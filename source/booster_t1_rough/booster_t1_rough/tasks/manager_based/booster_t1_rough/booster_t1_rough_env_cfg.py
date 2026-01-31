@@ -380,7 +380,7 @@ class RewardsCfg:
     # ---- (4) 强制把脚分开，防止自干涉 ----
     feet_separation = RewTerm(
         func=feet_lateral_separation_exp,
-        weight=-5.0,
+        weight=5.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot", body_names=["left_foot_link", "right_foot_link"]
