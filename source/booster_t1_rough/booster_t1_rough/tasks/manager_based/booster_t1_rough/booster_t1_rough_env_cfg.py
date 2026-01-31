@@ -317,7 +317,7 @@ class T1Rewards:
     # 手臂（中）
     arm_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-0.6,
+        weight=-0.1,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -332,19 +332,38 @@ class T1Rewards:
     )
 
     # 腿（弱，允许迈步）
+    # leg_joint_deviation = RewTerm(
+    #     func=mdp.joint_deviation_l1,
+    #     weight=-0.1,
+    #     params={
+    #         "asset_cfg": SceneEntityCfg(
+    #             "robot",
+    #             joint_names=[
+    #                 ".*_Hip_.*",
+    #                 ".*_Knee_.*",
+    #                 ".*_Ankle_.*",
+    #             ],
+    #         )
+    #     },
+    # )
     leg_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-0.1,
+        weight=-1.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
                 joint_names=[
-                    ".*_Hip_.*",
-                    ".*_Knee_.*",
-                    ".*_Ankle_.*",
-                ],
+                    ".*_Hip_Roll",
+                    ".*_Hip_Yaw"
+                ]
             )
         },
+    )
+
+    # 关节限位惩罚（防烧电机，真机必备）
+    joint_pos_limit = RewTerm(
+        mdp.joint_pos_limits, 
+        weight=-5.0
     )
 
     # =====================================================
@@ -376,7 +395,7 @@ class T1Rewards:
         func=feet_gait,
         weight=0.5,
         params={
-            "period": 0.7,
+            "period": 1.0,
             "offset": [0.0, 0.5],
             "threshold": 0.55,
             "command_name": "base_velocity",
@@ -400,10 +419,10 @@ class T1Rewards:
     # =====================================================
     # 6. 能量与安全
     # =====================================================
-    joint_torque_penalty = RewTerm(
-        func=mdp.joint_torques_l2,
-        weight=-2.0e-5,
-    )
+    # joint_torque_penalty = RewTerm(
+    #     func=mdp.joint_torques_l2,
+    #     weight=-2.0e-5,
+    # )
 
     action_rate_penalty = RewTerm(
         func=mdp.action_rate_l2,
@@ -425,7 +444,7 @@ class T1Rewards:
 
     alive = RewTerm(
         func=mdp.is_alive,
-        weight=0.01,
+        weight=0.15,
     )
 
 @configclass
