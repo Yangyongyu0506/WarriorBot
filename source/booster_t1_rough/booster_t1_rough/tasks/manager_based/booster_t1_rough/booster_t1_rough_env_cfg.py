@@ -285,6 +285,26 @@ class T1Rewards:
             )
         },
     )
+    # 治疗帕金森
+    arm_joint_vel_penalty = RewTerm(
+        func=mdp.joint_vel_l2,
+        weight=-0.01,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=[
+                    "Left_Shoulder_Pitch",
+                    "Left_Shoulder_Roll",
+                    "Left_Elbow_Pitch",
+                    "Left_Elbow_Yaw",
+                    "Right_Shoulder_Pitch",
+                    "Right_Shoulder_Roll",
+                    "Right_Elbow_Pitch",
+                    "Right_Elbow_Yaw",
+                ],
+            )
+        },
+    )
     # 腿：弱（允许迈步）
     leg_joint_deviation = RewTerm(
         func=mdp.joint_deviation_l1,
