@@ -9,6 +9,7 @@ statistics, stabilizing training across varying terrain difficulty.
 """
 
 import torch
+import torch.nn.functional as F
 from typing import TYPE_CHECKING, Union
 
 from isaaclab.managers import SceneEntityCfg
@@ -17,7 +18,7 @@ from isaaclab.utils.math import quat_error_magnitude
 from isaaclab.assets import Articulation
 from isaaclab.envs import ManagerBasedRLEnv
 
-from booster_train.tasks.manager_based.beyond_mimic.mdp.commands import MotionCommand
+from .commands import MotionCommand
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -26,7 +27,6 @@ if TYPE_CHECKING:
 def _get_body_indexes(command: MotionCommand, body_names: list[str] | None) -> list[int]:
     """Resolve indices of bodies to include according to `body_names` filter."""
     return [i for i, name in enumerate(command.cfg.body_names) if (body_names is None) or (name in body_names)]
-
 
 def _get_adaptive_sigma(env, key: str | float, error: Union[float, torch.Tensor]):
     """Return scalar sigma from fixed value or an EMA of observed errors.
@@ -47,14 +47,12 @@ def _get_adaptive_sigma(env, key: str | float, error: Union[float, torch.Tensor]
     env.reward_sigmas[key] = torch.minimum(env.reward_sigmas_ema[key], env.reward_sigmas.get(key, torch.tensor([100.], device=env.device))).clip(min=1e-8)
     return torch.sqrt(env.reward_sigmas[key])
 
-
 def motion_global_anchor_position_error_exp(env: ManagerBasedRLEnv, command_name: str, std: float | str) -> torch.Tensor:
     """Exponential reward on global anchor position tracking error."""
     command: MotionCommand = env.command_manager.get_term(command_name)
     error = torch.sum(torch.square(command.anchor_pos_w - command.robot_anchor_pos_w), dim=-1)
     std = _get_adaptive_sigma(env, std, error.mean())
     return torch.exp(-error / std**2)
-
 
 def motion_global_anchor_orientation_error_exp(
         env: ManagerBasedRLEnv, command_name: str, std: float | str) -> torch.Tensor:
@@ -63,7 +61,6 @@ def motion_global_anchor_orientation_error_exp(
     error = quat_error_magnitude(command.anchor_quat_w, command.robot_anchor_quat_w) ** 2
     std = _get_adaptive_sigma(env, std, error.mean())
     return torch.exp(-error / std**2)
-
 
 def motion_relative_body_position_error_exp(
     env: ManagerBasedRLEnv, command_name: str, std: float | str, body_names: list[str] | None = None
@@ -76,7 +73,6 @@ def motion_relative_body_position_error_exp(
     ).mean(dim=-1)
     std = _get_adaptive_sigma(env, std, error.mean())
     return torch.exp(-error / std**2)
-
 
 def motion_relative_body_orientation_error_exp(
     env: ManagerBasedRLEnv, command_name: str, std: float | str, body_names: list[str] | None = None
@@ -91,7 +87,6 @@ def motion_relative_body_orientation_error_exp(
     std = _get_adaptive_sigma(env, std, error.mean())
     return torch.exp(-error / std**2)
 
-
 def motion_global_body_linear_velocity_error_exp(
     env: ManagerBasedRLEnv, command_name: str, std: float | str, body_names: list[str] | None = None
 ) -> torch.Tensor:
@@ -104,7 +99,6 @@ def motion_global_body_linear_velocity_error_exp(
     std = _get_adaptive_sigma(env, std, error.mean())
     return torch.exp(-error / std**2)
 
-
 def motion_global_body_angular_velocity_error_exp(
     env: ManagerBasedRLEnv, command_name: str, std: float | str, body_names: list[str] | None = None
 ) -> torch.Tensor:
@@ -116,7 +110,6 @@ def motion_global_body_angular_velocity_error_exp(
     ).mean(dim=-1)
     std = _get_adaptive_sigma(env, std, error.mean())
     return torch.exp(-error / std**2)
-
 
 def feet_stance_time(
         env: ManagerBasedRLEnv, asset_name: str, feet_names: list[str], vel_threshold: float, desired_time: float
@@ -141,7 +134,6 @@ def feet_stance_time(
     env._buf_feet_stance_time += env.step_dt
     env._buf_feet_stance_time *= stance
     return rew_stanceTime
-
 
 def swing_foot_height_bonus(
         env: ManagerBasedRLEnv,
@@ -172,7 +164,6 @@ def swing_foot_height_bonus(
     bonus = (bonus * in_air.float()).sum(dim=1)
     return bonus
 
-
 def double_support_penalty(
         env: ManagerBasedRLEnv,
         sensor_cfg: SceneEntityCfg,
@@ -194,14 +185,13 @@ def double_support_penalty(
     cmd_speed = torch.linalg.norm(cmd[:, :2], dim=1)
     return (both_contact & (cmd_speed >= min_speed)).float()
 
-
 def feet_gait(
-        env: ManagerBasedRLEnv,
-        period: float,
-        offset: list[float],
-        sensor_cfg: SceneEntityCfg,
-        threshold: float = 0.5,
-        command_name=None,
+    env: ManagerBasedRLEnv,
+    period: float,
+    offset: list[float],
+    sensor_cfg: SceneEntityCfg,
+    threshold: float = 0.5,
+    command_name=None,
 ) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     is_contact = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids] > 0
@@ -223,6 +213,65 @@ def feet_gait(
         reward *= cmd_norm > 0.1
     return reward
 
+def _act_mirror_fn(act_mirror: torch.Tensor) -> torch.Tensor:
+    booster_joint_mirror_map = [0, 2, 1, 3, 4, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15, 18, 17, 20, 19, 22, 21]
+    negate_mask = torch.tensor([
+        1, 1, 1, 1, 1,
+        -1, -1,
+        1, 1, 1, 1,
+        -1, -1, -1, -1, -1, -1,
+        1, 1, 1, 1,
+        -1, -1
+    ], dtype=torch.float32, device=act_mirror.device
+    )
+    act = torch.empty_like(act_mirror)
+    act = act_mirror[:, booster_joint_mirror_map] * negate_mask
+    return act
+
+def _obs_mirror_fn(obs: torch.Tensor) -> torch.Tensor:
+    negate_mask = torch.tensor([
+        -1, 1, -1,    # base ang vel
+        1, -1, 1,    # projected gravity
+        1, -1, -1]  # cmd
+        , dtype=torch.float32, device=obs.device
+    )
+    return torch.cat(
+        [
+            obs[:, :9] * negate_mask[:9],
+            _act_mirror_fn(obs[:, 9:32]),
+            _act_mirror_fn(obs[:, 32:55]),
+            _act_mirror_fn(obs[:, 55:78]),
+        ],
+        dim=1,
+    )
+
+def mirror_policy_loss(
+    env: ManagerBasedRLEnv,
+    policy,                         # torch.nn.Module
+    obs_key: str = "policy",        # observation group name
+) -> torch.Tensor:
+    """
+    镜像一致性损失（Mirror Policy Loss）
+
+    对当前观测 obs：
+    1. 构造镜像观测 obs_mirror
+    2. 分别送入同一 policy
+    3. 约束 action 与 mirror(action_mirror) 一致
+
+    返回：
+        scalar loss (mean squared error)
+    """
+    obs = env.get_observations()[obs_key]  # [N, obs_dim]
+    obs_mirror = _obs_mirror_fn(obs)        # [N, obs_dim]
+
+    with torch.no_grad():
+        act_mirror = policy(obs_mirror)    # [N, act_dim]
+
+    act = policy(obs)                      # [N, act_dim]
+    act_mirror_back = _act_mirror_fn(act_mirror)  # [N, act_dim]
+
+    loss = F.mse_loss(act, act_mirror_back)
+    return loss
 
 def leg_joint_vel_symmetry_l2(
     env: ManagerBasedRLEnv,
