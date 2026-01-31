@@ -313,3 +313,37 @@ def leg_joint_pos_symmetry_l2(
     if clip is not None:
         reward = torch.clamp(reward, max=clip)
     return reward
+
+def feet_lateral_separation_exp(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    min_dist: float,
+    std: float,
+) -> torch.Tensor:
+    asset = env.scene[asset_cfg.name]
+
+    # 假设只有左右两只脚
+    foot_ids = asset_cfg.body_ids
+    assert len(foot_ids) == 2
+
+    foot_pos = asset.data.body_pos_w[:, foot_ids, :]  # [N, 2, 3]
+
+    # 横向距离（Y 轴）
+    lateral_dist = torch.abs(foot_pos[:, 0, 1] - foot_pos[:, 1, 1])
+
+    # 小于阈值就惩罚
+    diff = (min_dist - lateral_dist).clip(min=0.0)
+    return torch.exp(- diff * diff / (std * std))
+
+def support_force_balance(
+    env: ManagerBasedRLEnv,
+    sensor_cfg: SceneEntityCfg,
+) -> torch.Tensor:
+    sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+
+    forces = sensor.data.net_forces_w[..., 2].abs()  # Z 向
+    # forces shape [N, 2]
+
+    # 不希望一个脚承担几乎全部
+    imbalance = torch.abs(forces[:, 0] - forces[:, 1])
+    return imbalance

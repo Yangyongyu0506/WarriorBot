@@ -28,7 +28,7 @@ import isaaclab_tasks.manager_based.locomotion.velocity.mdp as mdp
 from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
 from .mdp.events import sync_action_offsets_to_defaults
 from .mdp.terminations import is_fallen
-from .mdp.rewards import feet_gait, leg_joint_vel_symmetry_l2, leg_joint_pos_symmetry_l2, double_support_penalty, feet_stance_time, swing_foot_height_bonus
+from .mdp.rewards import feet_gait, feet_lateral_separation_exp, leg_joint_vel_symmetry_l2, leg_joint_pos_symmetry_l2, double_support_penalty, feet_stance_time, swing_foot_height_bonus, support_force_balance
 # Pre-defined configs
 from .robots.booster import BOOSTER_T1_CFG  # isort: skip
 
@@ -213,7 +213,6 @@ class CurriculumCfg:
 
     terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
 
-
 @configclass
 class RewardsCfg:
     """Rewards for Booster T1 biped locomotion (anti-crutch, anti-shuffle)."""
@@ -378,6 +377,30 @@ class RewardsCfg:
         },
     )
 
+    # ---- (4) 强制把脚分开，防止自干涉 ----
+    feet_separation = RewTerm(
+        func=feet_lateral_separation_exp,
+        weight=-5.0,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot", body_names=["left_foot_link", "right_foot_link"]
+            ),
+            "min_dist": 0.5,
+            "std": 0.5,
+        },
+    )
+
+    # ---- (5) 强制两腿受力对称 ----
+    support_force_balance = RewTerm(
+        func=support_force_balance,
+        weight=-0.5,
+        params={
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces", body_names=["left_foot_link", "right_foot_link"]
+            ),
+        },
+    )
+
     # =========================================================
     # 6. 能量 & 平滑（兜底）
     # =========================================================
@@ -411,7 +434,6 @@ class RewardsCfg:
         func=mdp.is_alive,
         weight=0.01,
     )
-
 
 @configclass
 class BoosterT1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
