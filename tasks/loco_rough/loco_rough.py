@@ -192,5 +192,29 @@ class T1WalkControllerCfg(ControllerCfg):
 
     policy: LocomotionPolicyCfg = LocomotionPolicyCfg(
         obs_dof_vel_scale=1.0,
-        policy_joint_names=['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 'Head_pitch', 'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 'Left_Hip_Pitch', 'Right_Hip_Pitch', 'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 'Left_Hip_Roll', 'Right_Hip_Roll', 'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 'Left_Hip_Yaw', 'Right_Hip_Yaw', 'Left_Knee_Pitch', 'Right_Knee_Pitch', 'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 'Left_Ankle_Roll', 'Right_Ankle_Roll'],
+        policy_joint_names=[
+            'AAHead_yaw', 
+            'Left_Shoulder_Pitch', 
+            'Right_Shoulder_Pitch', 
+            'Waist', 
+            'Head_pitch', 
+            'Left_Shoulder_Roll', 
+            'Right_Shoulder_Roll', 
+            'Left_Hip_Pitch', 
+            'Right_Hip_Pitch', 
+            'Left_Elbow_Pitch', 
+            'Right_Elbow_Pitch', 
+            'Left_Hip_Roll', 
+            'Right_Hip_Roll', 
+            'Left_Elbow_Yaw', 
+            'Right_Elbow_Yaw', 
+            'Left_Hip_Yaw', 
+            'Right_Hip_Yaw', 
+            'Left_Knee_Pitch', 
+            'Right_Knee_Pitch', 
+            'Left_Ankle_Pitch', 
+            'Right_Ankle_Pitch', 
+            'Left_Ankle_Roll', 
+            'Right_Ankle_Roll'
+        ],
     )
