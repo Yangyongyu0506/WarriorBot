@@ -318,7 +318,7 @@ class RewardsCfg:
             "asset_cfg": SceneEntityCfg(
                 "robot",
                 joint_names=[
-                    ".*_Knee_.*",
+                    # ".*_Knee_.*",
                     ".*_Ankle_.*",
                 ],
             )
