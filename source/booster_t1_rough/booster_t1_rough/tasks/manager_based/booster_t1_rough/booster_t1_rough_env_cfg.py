@@ -325,9 +325,9 @@ class RewardsCfg:
         },
     )
 
-    right_leg_incite = RewTerm(
+    right_leg_incite = RewTerm( # 鼓励右腿动起来，防止拐杖解
         func=mdp.joint_vel_l2,
-        weight=1.0,
+        weight=5.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
