@@ -325,6 +325,17 @@ class RewardsCfg:
         },
     )
 
+    right_leg_incite = RewTerm(
+        func=mdp.joint_vel_l2,
+        weight=1.0,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot",
+                joint_names=["Right_Knee_Pitch", "Right_Hip_Pitch"],
+            )
+        }
+    )
+
     # 防止“并腿锁死”
     hip_roll_penalty = RewTerm(
         func=mdp.joint_deviation_l1,
@@ -354,29 +365,29 @@ class RewardsCfg:
         },
     )
 
-    # # ---- (2) stance 时间：不准点地腿 ----
-    # feet_stance_time = RewTerm(
-    #     func=feet_stance_time,
-    #     weight=-0.3,
-    #     params={
-    #         "asset_name": "robot",
-    #         "feet_names": ["left_foot_link", "right_foot_link"],
-    #         "vel_threshold": 0.08,
-    #         "desired_time": 0.3,
-    #     },
-    # )
+    # ---- (2) stance 时间：不准点地腿 ----
+    feet_stance_time = RewTerm(
+        func=feet_stance_time,
+        weight=-0.05,
+        params={
+            "asset_name": "robot",
+            "feet_names": ["left_foot_link", "right_foot_link"],
+            "vel_threshold": 0.08,
+            "desired_time": 0.3,
+        },
+    )
 
-    # # ---- (3) swing 脚高度：不准假摆 ----
-    # swing_foot_height = RewTerm(
-    #     func=swing_foot_height_bonus,
-    #     weight=0.5,
-    #     params={
-    #         "height_margin": 0.1,
-    #         "sensor_cfg": SceneEntityCfg(
-    #             "contact_forces", body_names=".*_foot_link"
-    #         ),
-    #     },
-    # )
+    # ---- (3) swing 脚高度：不准假摆 ----
+    swing_foot_height = RewTerm(
+        func=swing_foot_height_bonus,
+        weight=0.05,
+        params={
+            "height_margin": 0.1,
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces", body_names=".*_foot_link"
+            ),
+        },
+    )
 
     # ---- (4) 强制把脚分开，防止自干涉 ----
     feet_separation = RewTerm(
